@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FundFinder — నీ ఫండ్, నీ లెక్క</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Telugu:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:      #FFF8EC;
+    --paper:      #FFFFFF;
+    --ink:        #2A1D14;
+    --ink-soft:   #6E5B4E;
+    --kumkum:     #C1272D;   /* deep vermilion */
+    --marigold:   #F0A93B;   /* bathukamma marigold */
+    --ikat-teal:  #0F6E6E;   /* pochampally teal */
+    --gold-line:  #D9B65A;
+    --up:         #167A4C;
+    --down:       #B23A34;
+    --radius:     14px;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0;
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .telugu{ font-family:'Noto Sans Telugu','Inter',sans-serif; }
+  h1,h2,h3,.brand-name,.headline{ font-family:'Baloo 2','Noto Sans Telugu',sans-serif; }
+
+  a{ color:var(--kumkum); }
+  ::selection{ background:var(--marigold); color:var(--ink); }
+  :focus-visible{ outline:3px solid var(--ikat-teal); outline-offset:2px; }
+
+  /* ---------- signature motif: ikat diamond strip ---------- */
+  .ikat-strip{
+    height:9px;
+    background:
+      repeating-linear-gradient(45deg, var(--kumkum) 0 6px, transparent 6px 12px),
+      repeating-linear-gradient(-45deg, var(--ikat-teal) 0 6px, transparent 6px 12px);
+    background-color:var(--marigold);
+    opacity:0.9;
+  }
+
+  /* ---------- shell ---------- */
+  .wrap{ max-width:880px; margin:0 auto; padding:0 20px 64px; }
+
+  header.topbar{
+    display:flex; align-items:center; gap:12px;
+    padding:16px 20px; max-width:880px; margin:0 auto;
+  }
+  .mark{
+    width:42px; height:42px; border-radius:50%;
+    background:var(--kumkum); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:1.05rem; flex:none;
+    box-shadow:0 0 0 3px var(--marigold);
+  }
+  .brand-name{ font-size:1.3rem; font-weight:700; color:var(--ink); line-height:1.1; }
+  .brand-sub{ font-size:0.78rem; color:var(--ink-soft); }
+  .pills{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+  .pill{
+    font-size:0.72rem; font-weight:600; padding:5px 11px; border-radius:999px;
+    border:1.5px solid var(--gold-line); color:var(--ink-soft); background:var(--paper);
+  }
+  .pill.on{ color:var(--ikat-teal); border-color:var(--ikat-teal); }
+
+  /* ---------- hero ---------- */
+  .hero{ position:relative; padding:34px 0 8px; overflow:visible; }
+  .headline{ font-size:2.05rem; font-weight:700; margin:0 0 6px; line-height:1.25; }
+  .headline .accent{ color:var(--kumkum); }
+  .hero-sub{ color:var(--ink-soft); font-size:1rem; margin:0 0 22px; max-width:560px; }
+  .flower{ position:absolute; right:-6px; top:6px; width:96px; height:96px; opacity:0.9; }
+
+  @media (max-width:640px){
+    .headline{ font-size:1.55rem; }
+    .flower{ display:none; }
+  }
+
+  /* ---------- search ---------- */
+  .search-shell{ position:relative; z-index:30; }
+  .search-box{
+    display:flex; align-items:center; gap:10px;
+    background:var(--paper); border:2px solid var(--ink);
+    border-radius:999px; padding:12px 18px;
+  }
+  .search-box svg{ flex:none; }
+  .search-box input{
+    border:none; outline:none; flex:1; font-size:1rem; font-family:inherit;
+    background:transparent; color:var(--ink);
+  }
+  .search-box input::placeholder{ color:#A99785; }
+  .clear-btn{
+    border:none; background:var(--cream); color:var(--ink-soft);
+    width:24px; height:24px; border-radius:50%; cursor:pointer; font-size:0.8rem;
+    display:none; flex:none;
+  }
+  .clear-btn.show{ display:block; }
+
+  .suggest{
+    position:absolute; top:calc(100% + 8px); left:0; right:0;
+    background:var(--paper); border:1.5px solid var(--ink);
+    border-radius:var(--radius); overflow:hidden;
+    box-shadow:0 10px 28px rgba(42,29,20,0.16);
+    max-height:360px; overflow-y:auto;
+  }
+  .suggest-item{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:11px 16px; background:none; border:none; text-align:left;
+    font-family:inherit; font-size:0.92rem; color:var(--ink); cursor:pointer;
+    border-bottom:1px solid #F0E6D6;
+  }
+  .suggest-item:last-child{ border-bottom:none; }
+  .suggest-item:hover, .suggest-item:focus-visible{ background:#FBF0DC; }
+  .tag{
+    flex:none; font-size:0.65rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.03em; padding:2px 8px; border-radius:999px;
+  }
+  .tag.fund{ background:#E8F3F0; color:var(--ikat-teal); }
+  .tag.cat{ background:#FBEBD4; color:#93610E; }
+  .suggest-label{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .suggest-meta{ flex:none; font-size:0.76rem; color:var(--ink-soft); }
+  .suggest-empty{ padding:16px; font-size:0.9rem; color:var(--ink-soft); }
+
+  /* ---------- back link ---------- */
+  .back-link{
+    display:inline-flex; align-items:center; gap:6px; margin:22px 0 4px;
+    background:none; border:none; cursor:pointer; color:var(--ikat-teal);
+    font-weight:700; font-size:0.9rem; font-family:inherit; padding:4px 0;
+  }
+  .back-link:hover{ text-decoration:underline; }
+
+  /* ---------- category directory ---------- */
+  .section-label{
+    font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;
+    color:var(--ink-soft); font-weight:700; margin:34px 0 12px;
+  }
+  .asset-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:640px){ .asset-grid{ grid-template-columns:1fr; } }
+
+  details.asset-card{
+    background:var(--paper); border:1.5px solid var(--ink);
+    border-radius:var(--radius); overflow:hidden;
+  }
+  details.asset-card summary{
+    list-style:none; cursor:pointer; padding:14px 16px;
+    display:flex; align-items:center; gap:10px; font-weight:700; font-size:1rem;
+  }
+  details.asset-card summary::-webkit-details-marker{ display:none; }
+  details.asset-card summary:hover{ background:#FBF0DC; }
+  details.asset-card .count{ margin-left:auto; font-weight:500; font-size:0.78rem; color:var(--ink-soft); }
+  details.asset-card summary::after{
+    content:""; flex:none; width:8px; height:8px;
+    border-right:2px solid var(--ink-soft); border-bottom:2px solid var(--ink-soft);
+    transform:rotate(45deg); transition:transform .15s ease;
+  }
+  details.asset-card[open] summary::after{ transform:rotate(-135deg); }
+  .subcat-list{ padding:2px 12px 14px; display:flex; flex-direction:column; gap:6px; }
+  .subcat-btn{
+    text-align:left; background:var(--cream); border:1px solid var(--gold-line);
+    border-radius:10px; padding:9px 12px; font-family:inherit; font-size:0.88rem;
+    color:var(--ink); cursor:pointer;
+  }
+  .subcat-btn:hover{ border-color:var(--kumkum); color:var(--kumkum); }
+
+  /* ---------- fund cards (top-N) ---------- */
+  .cat-heading{ font-size:1.15rem; font-weight:700; margin:0 0 2px; }
+  .cat-heading .cat-name{ color:var(--kumkum); }
+  .cat-note{ color:var(--ink-soft); font-size:0.85rem; margin:0 0 16px; }
+  .fund-card{
+    background:var(--paper); border:1.5px solid var(--ink); border-radius:var(--radius);
+    padding:14px 16px; margin-bottom:10px;
+  }
+  .fund-head{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .rank{
+    flex:none; width:26px; height:26px; border-radius:50%; background:var(--cream);
+    border:1.5px solid var(--ink); display:flex; align-items:center; justify-content:center;
+    font-size:0.78rem; font-weight:800;
+  }
+  .fund-card:first-child .rank{ background:var(--marigold); border-color:var(--kumkum); }
+  .fund-name-btn{
+    flex:1; text-align:left; background:none; border:none; font-family:inherit;
+    font-weight:700; font-size:0.96rem; color:var(--ink); cursor:pointer; padding:0;
+  }
+  .fund-name-btn:hover{ color:var(--kumkum); text-decoration:underline; }
+  .fund-sub{ font-size:0.78rem; color:var(--ink-soft); font-weight:500; }
+  .metric-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(76px,1fr)); gap:8px; }
+  .metric{ background:var(--cream); border-radius:9px; padding:7px 10px; }
+  .metric-label{ font-size:0.65rem; text-transform:uppercase; letter-spacing:0.03em; color:var(--ink-soft); font-weight:700; }
+  .metric-value{ font-size:0.94rem; font-weight:800; }
+  .metric-value.pos{ color:var(--up); }
+  .metric-value.neg{ color:var(--down); }
+
+  /* ---------- fund profile ---------- */
+  .profile-title{ font-size:1.5rem; font-weight:700; margin:22px 0 4px; }
+  .profile-sub{ color:var(--ink-soft); font-size:0.92rem; margin-bottom:16px; }
+  .basic-list{ list-style:none; margin:0 0 20px; padding:0; display:flex; flex-direction:column; gap:5px; }
+  .basic-list li{ font-size:0.92rem; }
+  .basic-list b{ font-weight:700; }
+
+  .horizon-hint{ color:var(--ink-soft); font-size:0.8rem; font-style:italic; margin:0 0 8px; }
+  details.horizon{
+    background:var(--paper); border:1.5px solid var(--ink); border-radius:12px;
+    margin-bottom:8px; overflow:hidden;
+  }
+  details.horizon summary{
+    list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px;
+    padding:11px 14px; font-weight:700;
+  }
+  details.horizon summary::-webkit-details-marker{ display:none; }
+  details.horizon summary:hover{ background:#FBF0DC; }
+  details.horizon[open] summary{ background:#FBF0DC; border-bottom:1px solid var(--gold-line); }
+  .h-period{
+    flex:none; background:var(--cream); border:1px solid var(--gold-line); border-radius:999px;
+    padding:2px 10px; font-size:0.76rem; font-weight:800;
+  }
+  details.horizon[open] .h-period{ background:var(--kumkum); color:#fff; border-color:var(--kumkum); }
+  .h-return-wrap{ display:flex; align-items:baseline; gap:6px; }
+  .h-return-label{ color:var(--ink-soft); font-size:0.78rem; font-weight:500; }
+  .h-return{ font-weight:800; }
+  .h-return.pos{ color:var(--up); }
+  .h-return.neg{ color:var(--down); }
+  .horizon-body{ padding:4px 16px 14px 28px; margin:0; }
+  .horizon-body li{ padding:3px 0; font-size:0.89rem; }
+
+  .score-line{ font-weight:700; margin:14px 0 22px; font-size:0.94rem; }
+
+  .verdict-card{
+    border:1.5px solid var(--ink); border-radius:var(--radius); padding:16px;
+    background:var(--paper); margin-bottom:8px;
+  }
+  .verdict-badge{
+    display:inline-block; font-weight:800; font-size:0.85rem; padding:5px 14px;
+    border-radius:999px; margin-bottom:10px;
+  }
+  .verdict-badge.INVEST{ background:#E4F3EB; color:var(--up); }
+  .verdict-badge.AVOID{ background:#FBEAE9; color:var(--down); }
+  .verdict-badge.NEUTRAL{ background:#FBF0DC; color:#93610E; }
+  .verdict-body{ font-size:0.92rem; line-height:1.55; margin:0 0 10px; }
+  .verdict-disclaimer{ font-size:0.78rem; color:var(--ink-soft); font-style:italic; margin:0; }
+
+  /* ---------- footer ---------- */
+  footer{ margin-top:48px; padding-top:20px; border-top:1.5px solid var(--gold-line); }
+  footer p{ font-size:0.8rem; color:var(--ink-soft); line-height:1.6; }
+  footer .footer-telugu{ margin-top:6px; }
+
+  .empty-note{ color:var(--ink-soft); font-size:0.92rem; margin-top:8px; }
+
+  .view-all-btn{
+    display:block; width:100%; margin-top:6px; padding:12px 16px;
+    background:var(--paper); border:1.5px dashed var(--kumkum); border-radius:var(--radius);
+    color:var(--kumkum); font-family:inherit; font-weight:700; font-size:0.9rem; cursor:pointer;
+  }
+  .view-all-btn:hover{ background:#FBEAE9; }
+</style>
+</head>
+<body>
+
+<div class="ikat-strip"></div>
+<header class="topbar">
+  <div class="mark">FF</div>
+  <div>
+    <div class="brand-name">FundFinder</div>
+    <div class="brand-sub telugu">నీ ఫండ్, నీ లెక్క — search first, invest smart</div>
+  </div>
+  <div class="pills">
+    <span class="pill on" id="fundCountPill">— funds</span>
+    <span class="pill">Made in Telangana</span>
+  </div>
+</header>
+<div class="ikat-strip"></div>
+
+<div class="wrap">
+
+  <section class="hero">
+    <svg class="flower" viewBox="0 0 100 100" aria-hidden="true">
+      <circle cx="50" cy="50" r="10" fill="#93610E"/>
+      <g fill="none" stroke-width="9" stroke-linecap="round">
+        <circle cx="50" cy="50" r="24" stroke="#F0A93B" stroke-dasharray="8 6"/>
+        <circle cx="50" cy="50" r="36" stroke="#C1272D" stroke-dasharray="7 7"/>
+        <circle cx="50" cy="50" r="47" stroke="#0F6E6E" stroke-dasharray="6 9"/>
+      </g>
+    </svg>
+    <h1 class="headline">Search a fund like you'd <span class="accent telugu">బతుకమ్మ</span> gaddi —<br>pick, compare, decide.</h1>
+    <p class="hero-sub">Type a fund name, an AMC, or a category — Large Cap, ELSS, Flexi Cap, whatever. No sign-up, no jargon overload, just the numbers a first-jobber in Hyderabad or a final-year student in Warangal actually needs before putting money in.</p>
+
+    <div class="search-shell">
+      <div class="search-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6E5B4E" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6"/></svg>
+        <input id="searchInput" type="text" placeholder="Try 'HDFC Flexi Cap', 'ELSS', or 'Small Cap Fund'" autocomplete="off">
+        <button class="clear-btn" id="clearBtn" aria-label="Clear search">✕</button>
+      </div>
+      <div class="suggest" id="suggestBox" hidden></div>
+    </div>
+  </section>
+
+  <div id="backSlot"></div>
+  <main id="mainArea"></main>
+
+  <footer>
+    <p><b>Disclaimer:</b> Every fund shown here is illustrative sample data for this demo build — not live NAVs, not real AMC filings. Rankings, scores, and the "AI Verdict" are generated from that sample data for informational purposes only and are not financial, investment, tax, or legal advice. Past performance never guarantees future returns — please do your own homework and talk to a registered financial advisor before investing.</p>
+    <p class="footer-telugu telugu">నీ డబ్బులు, నీ నిర్ణయం — ఇది కేవలం ఒక సాధనం, సలహా కాదు.</p>
+  </footer>
+</div>
+
+<script>
+/* =====================================================================
+   Sample dataset — illustrative numbers only, not real market data.
+   Mirrors the shape of the original MF_Risk_Metrics sheet: one row per
+   fund, grouped by Asset Type -> Sub Category, with return/risk metrics
+   at a few horizons plus a composite score used for ranking.
+   ===================================================================== */
+const FUNDS = [
+  // ---- Equity: Large Cap Fund ----
+  fund("HDFC Top 100 Fund","HDFC Mutual Fund","Equity","Large Cap Fund",912.4,{"1D":0.004,"6M":0.081,"1Y":0.152,"3Y":0.148,"5Y":0.131},{vol:0.132,mdd:-0.181,sharpe:1.02,sortino:1.41,calmar:0.82},87,4),
+  fund("SBI Bluechip Fund","SBI Mutual Fund","Equity","Large Cap Fund",78.9,{"1D":0.003,"6M":0.076,"1Y":0.139,"3Y":0.135,"5Y":0.122},{vol:0.129,mdd:-0.176,sharpe:0.95,sortino:1.32,calmar:0.77},74,7),
+  fund("ICICI Prudential Bluechip Fund","ICICI Prudential Mutual Fund","Equity","Large Cap Fund",96.2,{"1D":0.004,"6M":0.089,"1Y":0.161,"3Y":0.155,"5Y":0.140},{vol:0.126,mdd:-0.163,sharpe:1.14,sortino:1.55,calmar:0.95},92,2),
+  fund("Axis Bluechip Fund","Axis Mutual Fund","Equity","Large Cap Fund",54.1,{"1D":0.002,"6M":0.062,"1Y":0.108,"3Y":0.098,"5Y":0.101},{vol:0.135,mdd:-0.199,sharpe:0.68,sortino:0.94,calmar:0.49},41,12),
+
+  // ---- Equity: Mid Cap Fund ----
+  fund("Kotak Emerging Equity Fund","Kotak Mutual Fund","Equity","Mid Cap Fund",112.6,{"1D":0.005,"6M":0.118,"1Y":0.221,"3Y":0.219,"5Y":0.184},{vol:0.187,mdd:-0.242,sharpe:1.05,sortino:1.38,calmar:0.90},88,3),
+  fund("Nippon India Growth Fund","Nippon India Mutual Fund","Equity","Mid Cap Fund",3241.0,{"1D":0.004,"6M":0.101,"1Y":0.198,"3Y":0.201,"5Y":0.176},{vol:0.191,mdd:-0.256,sharpe:0.94,sortino:1.24,calmar:0.78},76,6),
+  fund("PGIM India Midcap Opportunities Fund","PGIM India Mutual Fund","Equity","Mid Cap Fund",58.4,{"1D":0.001,"6M":0.052,"1Y":0.079,"3Y":0.061,"5Y":0.089},{vol:0.212,mdd:-0.311,sharpe:0.31,sortino:0.44,calmar:0.20},22,17),
+
+  // ---- Equity: Small Cap Fund ----
+  fund("SBI Small Cap Fund","SBI Mutual Fund","Equity","Small Cap Fund",164.8,{"1D":0.006,"6M":0.142,"1Y":0.267,"3Y":0.258,"5Y":0.221},{vol:0.223,mdd:-0.279,sharpe:1.11,sortino:1.47,calmar:0.93},90,2),
+  fund("Axis Small Cap Fund","Axis Mutual Fund","Equity","Small Cap Fund",89.3,{"1D":0.005,"6M":0.121,"1Y":0.229,"3Y":0.234,"5Y":0.203},{vol:0.219,mdd:-0.268,sharpe:1.06,sortino:1.40,calmar:0.87},84,4),
+  fund("Quant Small Cap Fund","quant Mutual Fund","Equity","Small Cap Fund","240.7",{"1D":0.007,"6M":0.169,"1Y":0.298,"3Y":0.276,"5Y":0.239},{vol:0.241,mdd:-0.301,sharpe:1.09,sortino:1.44,calmar:0.92},89,3),
+
+  // ---- Equity: Flexi Cap Fund ----
+  fund("Parag Parikh Flexi Cap Fund","PPFAS Mutual Fund","Equity","Flexi Cap Fund",83.5,{"1D":0.003,"6M":0.094,"1Y":0.178,"3Y":0.183,"5Y":0.169},{vol:0.141,mdd:-0.169,sharpe:1.28,sortino:1.72,calmar:1.05},95,1),
+  fund("HDFC Flexi Cap Fund","HDFC Mutual Fund","Equity","Flexi Cap Fund",1789.0,{"1D":0.004,"6M":0.088,"1Y":0.169,"3Y":0.171,"5Y":0.148},{vol:0.148,mdd:-0.184,sharpe:1.09,sortino:1.46,calmar:0.88},85,3),
+  fund("UTI Flexi Cap Fund","UTI Mutual Fund","Equity","Flexi Cap Fund",268.4,{"1D":0.001,"6M":0.041,"1Y":0.062,"3Y":0.051,"5Y":0.079},{vol:0.156,mdd:-0.238,sharpe:0.29,sortino:0.38,calmar:0.16},19,18),
+
+  // ---- Equity: ELSS ----
+  fund("Mirae Asset Tax Saver Fund","Mirae Asset Mutual Fund","Equity","ELSS",42.6,{"1D":0.004,"6M":0.092,"1Y":0.174,"3Y":0.176,"5Y":0.152},{vol:0.144,mdd:-0.177,sharpe:1.15,sortino:1.53,calmar:0.94},89,2),
+  fund("Axis Long Term Equity Fund","Axis Mutual Fund","Equity","ELSS",98.1,{"1D":0.002,"6M":0.058,"1Y":0.099,"3Y":0.089,"5Y":0.096},{vol:0.151,mdd:-0.221,sharpe:0.59,sortino:0.77,calmar:0.41},34,14),
+  fund("Quant ELSS Tax Saver Fund","quant Mutual Fund","Equity","ELSS",312.9,{"1D":0.006,"6M":0.131,"1Y":0.249,"3Y":0.231,"5Y":0.201},{vol:0.203,mdd:-0.263,sharpe:1.02,sortino:1.34,calmar:0.86},83,4),
+
+  // ---- Equity: Focused Fund ----
+  fund("SBI Focused Equity Fund","SBI Mutual Fund","Equity","Focused Fund",312.6,{"1D":0.003,"6M":0.071,"1Y":0.129,"3Y":0.121,"5Y":0.114},{vol:0.138,mdd:-0.192,sharpe:0.79,sortino:1.05,calmar:0.60},59,9),
+  fund("Axis Focused Fund","Axis Mutual Fund","Equity","Focused Fund",47.8,{"1D":0.002,"6M":0.049,"1Y":0.081,"3Y":0.068,"5Y":0.082},{vol:0.146,mdd:-0.229,sharpe:0.38,sortino:0.51,calmar:0.24},27,16),
+
+  // ---- Debt: Banking and PSU Fund ----
+  fund("HDFC Banking and PSU Debt Fund","HDFC Mutual Fund","Debt","Debt Scheme - Banking and PSU Fund",21.4,{"1D":0.0002,"6M":0.032,"1Y":0.069,"3Y":0.061,"5Y":0.067},{vol:0.021,mdd:-0.019,sharpe:1.31,sortino:1.98,calmar:2.85},81,2),
+  fund("Aditya Birla Sun Life Banking & PSU Debt Fund","Aditya Birla Sun Life Mutual Fund","Debt","Debt Scheme - Banking and PSU Fund",317.9,{"1D":0.0002,"6M":0.030,"1Y":0.065,"3Y":0.058,"5Y":0.064},{vol:0.023,mdd:-0.022,sharpe:1.19,sortino:1.76,calmar:2.41},72,3),
+
+  // ---- Debt: Corporate Bond Fund ----
+  fund("ICICI Prudential Corporate Bond Fund","ICICI Prudential Mutual Fund","Debt","Debt Scheme - Corporate Bond Fund",27.8,{"1D":0.0002,"6M":0.031,"1Y":0.068,"3Y":0.060,"5Y":0.066},{vol:0.019,mdd:-0.016,sharpe:1.38,sortino:2.05,calmar:3.02},86,1),
+  fund("HDFC Corporate Bond Fund","HDFC Mutual Fund","Debt","Debt Scheme - Corporate Bond Fund",30.1,{"1D":0.0002,"6M":0.029,"1Y":0.063,"3Y":0.057,"5Y":0.063},{vol:0.020,mdd:-0.018,sharpe:1.24,sortino:1.85,calmar:2.55},68,4),
+
+  // ---- Hybrid: Aggressive Hybrid Fund ----
+  fund("ICICI Prudential Equity & Debt Fund","ICICI Prudential Mutual Fund","Hybrid","Hybrid Scheme - Aggressive Hybrid Fund",412.5,{"1D":0.003,"6M":0.081,"1Y":0.156,"3Y":0.159,"5Y":0.139},{vol:0.109,mdd:-0.142,sharpe:1.22,sortino:1.63,calmar:1.02},91,1),
+  fund("SBI Equity Hybrid Fund","SBI Mutual Fund","Hybrid","Hybrid Scheme - Aggressive Hybrid Fund",289.4,{"1D":0.002,"6M":0.064,"1Y":0.118,"3Y":0.112,"5Y":0.107},{vol:0.101,mdd:-0.138,sharpe:0.97,sortino:1.28,calmar:0.79},70,3),
+
+  // ---- Hybrid: Balanced Advantage Fund ----
+  fund("HDFC Balanced Advantage Fund","HDFC Mutual Fund","Hybrid","Hybrid Scheme - Balanced Advantage Fund",412.9,{"1D":0.002,"6M":0.069,"1Y":0.131,"3Y":0.129,"5Y":0.118},{vol:0.093,mdd:-0.121,sharpe:1.18,sortino:1.55,calmar:1.06},88,1),
+  fund("Kotak Balanced Advantage Fund","Kotak Mutual Fund","Hybrid","Hybrid Scheme - Balanced Advantage Fund",21.6,{"1D":0.001,"6M":0.051,"1Y":0.094,"3Y":0.087,"5Y":0.084},{vol:0.086,mdd:-0.114,sharpe:0.86,sortino:1.11,calmar:0.72},58,4),
+
+  // ---- Index ETF: Nifty 50 Index Fund ----
+  fund("UTI Nifty 50 Index Fund","UTI Mutual Fund","Index ETF","Index Funds - Nifty 50 Index Fund",184.2,{"1D":0.003,"6M":0.072,"1Y":0.137,"3Y":0.134,"5Y":0.121},{vol:0.121,mdd:-0.171,sharpe:0.92,sortino:1.21,calmar:0.75},65,1),
+  fund("HDFC Index Fund Nifty 50 Plan","HDFC Mutual Fund","Index ETF","Index Funds - Nifty 50 Index Fund",213.9,{"1D":0.003,"6M":0.071,"1Y":0.136,"3Y":0.133,"5Y":0.120},{vol:0.121,mdd:-0.171,sharpe:0.91,sortino:1.20,calmar:0.74},63,2),
+
+  // ---- Index ETF: Sensex Index Fund ----
+  fund("SBI Sensex Index Fund","SBI Mutual Fund","Index ETF","Index Funds - Sensex Index Fund",22.3,{"1D":0.003,"6M":0.070,"1Y":0.132,"3Y":0.130,"5Y":0.118},{vol:0.119,mdd:-0.168,sharpe:0.90,sortino:1.18,calmar:0.73},61,1),
+];
+
+function fund(name,amc,assetType,subCategory,nav,returns,risk,peerPctile,peerRank){
+  return {name,amc,assetType,subCategory,nav:Number(nav),returns,risk,peerPctile,peerRank,
+    compositeScore: Math.round((peerPctile*0.7 + risk.sharpe*10)*10)/10 };
+}
+
+/* ---- Asset Type -> Sub Category directory, built from the data ---- */
+function buildDirectory(){
+  const map = {};
+  FUNDS.forEach(f=>{
+    map[f.assetType] = map[f.assetType] || new Set();
+    map[f.assetType].add(f.subCategory);
+  });
+  const order = ["Equity","Debt","Hybrid","Index ETF"];
+  return order.filter(a=>map[a]).map(a=>({assetType:a, subs:[...map[a]].sort()}));
+}
+
+function subCatLabel(raw){
+  return raw.replace(/^Debt Scheme - /,"").replace(/^Hybrid Scheme - /,"").replace(/^Index Funds - /,"");
+}
+
+/* ---------------------------------------------------------------------
+   Simple offline fuzzy scoring: word-overlap + substring boost. Good
+   enough for a demo search box, mirrors the intent of the original
+   token_set_ratio approach without needing a fuzzy-matching library.
+   --------------------------------------------------------------------- */
+function norm(s){ return s.toLowerCase().replace(/funds?\b/g,"fund").replace(/\s+/g," ").trim(); }
+
+function score(query, target){
+  const q = norm(query), t = norm(target);
+  if(!q) return 0;
+  if(t === q) return 1;
+  if(t.includes(q)) return 0.85 + Math.min(0.1, q.length/target.length*0.1);
+  const qWords = new Set(q.split(" ").filter(Boolean));
+  const tWords = new Set(t.split(" ").filter(Boolean));
+  let overlap = 0;
+  qWords.forEach(w=>{ if([...tWords].some(tw=>tw.includes(w)||w.includes(tw))) overlap++; });
+  if(overlap===0) return 0;
+  return 0.35 + 0.5*(overlap/qWords.size);
+}
+
+function searchSuggestions(query, limit=8){
+  const results = [];
+  FUNDS.forEach(f=>{
+    const s = Math.max(score(query,f.name), score(query, f.amc+" "+f.name));
+    if(s >= 0.35) results.push({type:"fund", label:f.name, meta:f.amc, value:f.name, score:s});
+  });
+  const seenCat = new Map();
+  FUNDS.forEach(f=>{
+    const label = subCatLabel(f.subCategory);
+    if(seenCat.has(label)) return;
+    seenCat.set(label, true);
+    const s = score(query, label);
+    if(s >= 0.35) results.push({type:"category", label, meta:f.assetType, value:f.subCategory, score:s});
+  });
+  results.sort((a,b)=>b.score-a.score);
+  return results.slice(0,limit);
+}
+
+/* ---------------------------------------------------------------------
+   Rendering
+   --------------------------------------------------------------------- */
+const mainArea = document.getElementById("mainArea");
+const backSlot = document.getElementById("backSlot");
+const searchInput = document.getElementById("searchInput");
+const suggestBox = document.getElementById("suggestBox");
+const clearBtn = document.getElementById("clearBtn");
+
+document.getElementById("fundCountPill").textContent = FUNDS.length + " sample funds";
+
+function esc(s){ const d=document.createElement("div"); d.textContent=String(s); return d.innerHTML; }
+function pct(v,{annualised=false}={}){ return (v*100).toFixed(2)+"%"+(annualised?" p.a.":""); }
+function signClass(v){ return v>0?"pos":(v<0?"neg":""); }
+
+function renderBack(show){
+  backSlot.innerHTML = show
+    ? `<button class="back-link" id="backBtn">&larr; Back to search</button>`
+    : "";
+  if(show) document.getElementById("backBtn").onclick = goHome;
+}
+
+function goHome(){
+  searchInput.value = "";
+  closeSuggestions();
+  renderBack(false);
+  renderHome();
+}
+
+function renderHome(){
+  const dirs = buildDirectory();
+  let html = `<div class="section-label">Browse by category</div><div class="asset-grid">`;
+  dirs.forEach(d=>{
+    html += `<details class="asset-card"><summary>${esc(d.assetType)}<span class="count">${d.subs.length} categories</span></summary>
+      <div class="subcat-list">`;
+    d.subs.forEach(sc=>{
+      html += `<button class="subcat-btn" data-cat="${esc(sc)}">${esc(subCatLabel(sc))}</button>`;
+    });
+    html += `</div></details>`;
+  });
+  html += `</div>`;
+  mainArea.innerHTML = html;
+  mainArea.querySelectorAll(".subcat-btn").forEach(btn=>{
+    btn.onclick = ()=>openCategory(btn.dataset.cat);
+  });
+}
+
+const TOP_N = 2;
+
+function openCategory(subCategory, showAll){
+  renderBack(true);
+  const label = subCatLabel(subCategory);
+  const all = FUNDS.filter(f=>f.subCategory===subCategory)
+                    .slice()
+                    .sort((a,b)=>b.compositeScore-a.compositeScore);
+  const subset = showAll ? all : all.slice(0, TOP_N);
+  const heading = showAll ? "All funds in" : "Top funds in";
+  const note = showAll
+    ? `${all.length} fund${all.length===1?"":"s"} · every fund we have in this category, ranked by composite score. Tap a fund for the full sheet.`
+    : `Showing top ${subset.length} of ${all.length} · ranked by composite score (return, risk-adjusted return, drawdown &amp; volatility vs. category peers). Tap a fund for the full sheet.`;
+
+  let html = `<h2 class="cat-heading">${heading} <span class="cat-name">${esc(label)}</span></h2>
+    <p class="cat-note">${note}</p>`;
+
+  subset.forEach((f,i)=>{
+    const horizons = [["1D","1D"],["6M","6M"],["1Y","1Y"],["3Y","3Y"],["5Y","5Y"]];
+    let chips = "";
+    horizons.forEach(([key,label])=>{
+      const v = f.returns[key];
+      chips += `<div class="metric"><span class="metric-label">${label}</span>
+        <span class="metric-value ${signClass(v)}">${pct(v)}</span></div>`;
+    });
+    html += `<div class="fund-card">
+      <div class="fund-head">
+        <span class="rank">${i+1}</span>
+        <div style="flex:1;min-width:0;">
+          <button class="fund-name-btn" data-fund="${esc(f.name)}">${esc(f.name)}</button><br>
+          <span class="fund-sub">${esc(f.amc)}</span>
+        </div>
+      </div>
+      <div class="metric-grid">${chips}</div>
+    </div>`;
+  });
+
+  if(!showAll && all.length > TOP_N){
+    html += `<button class="view-all-btn" id="viewAllBtn">View all ${all.length} funds in ${esc(label)}</button>`;
+  } else if(showAll){
+    html += `<button class="view-all-btn" id="viewTopBtn">Show top performers only</button>`;
+  }
+
+  mainArea.innerHTML = html;
+  mainArea.querySelectorAll(".fund-name-btn").forEach(btn=>{
+    btn.onclick = ()=>openFund(btn.dataset.fund);
+  });
+  const viewAllBtn = document.getElementById("viewAllBtn");
+  if(viewAllBtn) viewAllBtn.onclick = ()=>openCategory(subCategory, true);
+  const viewTopBtn = document.getElementById("viewTopBtn");
+  if(viewTopBtn) viewTopBtn.onclick = ()=>openCategory(subCategory, false);
+}
+
+function buildVerdict(f){
+  const s = f.compositeScore;
+  let verdict = "NEUTRAL";
+  if(s>=80) verdict="INVEST"; else if(s<=45) verdict="AVOID";
+  const cagr3y = pct(f.returns["3Y"], {annualised:true});
+  const vol = pct(f.risk.vol);
+  const mdd = pct(f.risk.mdd);
+  const pctile = f.peerPctile + "th percentile";
+  let body;
+  if(verdict==="INVEST"){
+    body = `Over the past 3 years this fund has compounded at roughly ${cagr3y}, with a Sharpe ratio of ${f.risk.sharpe.toFixed(2)} that suggests the return has come with reasonably controlled risk. Its worst drawdown of ${mdd} is manageable for the category, and it ranks in the ${pctile} against peers on the blended score. Volatility sits around ${vol}, in line with what's typical for ${subCatLabel(f.subCategory)} funds.`;
+  } else if(verdict==="AVOID"){
+    body = `The 3-year CAGR of ${cagr3y} has come with a drawdown of ${mdd} and a Sharpe ratio of only ${f.risk.sharpe.toFixed(2)} — the return hasn't compensated well for the risk taken. It sits in the ${pctile} against category peers, on the lower side of the pack. Volatility of ${vol} is also on the higher end for this category.`;
+  } else {
+    body = `Numbers here are mixed: a 3-year CAGR of ${cagr3y} against a drawdown of ${mdd} and a Sharpe ratio of ${f.risk.sharpe.toFixed(2)} don't clearly lean either way. It's placed in the ${pctile} against peers — middling rather than standout. Worth weighing against your own goals and time horizon rather than the numbers alone.`;
+  }
+  return {verdict, body};
+}
+
+function openFund(name){
+  renderBack(true);
+  const f = FUNDS.find(x=>x.name===name);
+  if(!f){ mainArea.innerHTML = `<p class="empty-note">Couldn't find "${esc(name)}" in the sample dataset.</p>`; return; }
+
+  let html = `<h2 class="profile-title">${esc(f.name)}</h2>
+    <p class="profile-sub">${esc(f.amc)}</p>
+    <ul class="basic-list">
+      <li><b>Category:</b> ${esc(subCatLabel(f.subCategory))}</li>
+      <li><b>Asset Type:</b> ${esc(f.assetType)}</li>
+      <li><b>Latest NAV:</b> ₹${f.nav.toFixed(2)}</li>
+    </ul>
+
+    <div class="section-label" style="margin-top:0;">Performance &amp; Risk by Horizon</div>
+    <p class="horizon-hint">Tap a period to see the full breakdown.</p>`;
+
+  const horizonMeta = [
+    ["1D","1D"],["6M","6M"],["1Y","1Y"],["3Y","3Y"],["5Y","5Y"]
+  ];
+  horizonMeta.forEach(([key,label])=>{
+    const v = f.returns[key];
+    html += `<details class="horizon">
+      <summary>
+        <span class="h-period">${label}</span>
+        <span class="h-return-wrap">
+          <span class="h-return-label">Return</span>
+          <span class="h-return ${signClass(v)}">${pct(v)}</span>
+        </span>
+      </summary>
+      <ul class="horizon-body">
+        <li>Absolute Return: ${pct(v)}</li>
+        ${key==="3Y"||key==="5Y" ? `<li>Volatility (Std. Dev.): ${pct(f.risk.vol)}</li>
+        <li>Max Drawdown: ${pct(f.risk.mdd)}</li>
+        <li>Sharpe Ratio: ${f.risk.sharpe.toFixed(2)}</li>
+        <li>Sortino Ratio: ${f.risk.sortino.toFixed(2)}</li>
+        <li>Calmar Ratio: ${f.risk.calmar.toFixed(2)}</li>` : ``}
+      </ul>
+    </details>`;
+  });
+
+  html += `<p class="score-line">Composite Score: ${f.compositeScore} &middot; Peer Rank: #${f.peerRank}</p>`;
+
+  const {verdict, body} = buildVerdict(f);
+  html += `<div class="section-label" style="margin-top:8px;">AI Verdict</div>
+    <div class="verdict-card">
+      <span class="verdict-badge ${verdict}">${verdict}</span>
+      <p class="verdict-body">${esc(body)}</p>
+      <p class="verdict-disclaimer">Automated read of this sample's historical numbers only — not personalised financial advice. Please consider your own goals and horizon, and talk to a registered advisor before investing.</p>
+    </div>`;
+
+  mainArea.innerHTML = html;
+}
+
+/* ---------------------------------------------------------------------
+   Search box + live suggestions
+   --------------------------------------------------------------------- */
+function closeSuggestions(){
+  suggestBox.hidden = true;
+  suggestBox.innerHTML = "";
+  clearBtn.classList.remove("show");
+}
+
+function renderSuggestions(query){
+  if(!query.trim()){ closeSuggestions(); return; }
+  clearBtn.classList.add("show");
+  const results = searchSuggestions(query);
+  if(!results.length){
+    suggestBox.innerHTML = `<div class="suggest-empty">No matching fund or category in the sample data. Try a category like "Small Cap" or "ELSS".</div>`;
+    suggestBox.hidden = false;
+    return;
+  }
+  suggestBox.innerHTML = results.map(r=>`
+    <button class="suggest-item" data-type="${r.type}" data-value="${esc(r.value)}">
+      <span class="tag ${r.type==="fund"?"fund":"cat"}">${r.type==="fund"?"Fund":"Category"}</span>
+      <span class="suggest-label">${esc(r.label)}</span>
+      <span class="suggest-meta">${esc(r.meta)}</span>
+    </button>`).join("");
+  suggestBox.hidden = false;
+  suggestBox.querySelectorAll(".suggest-item").forEach(btn=>{
+    btn.onclick = ()=>{
+      const {type, value} = btn.dataset;
+      closeSuggestions();
+      if(type==="fund") openFund(value); else openCategory(value);
+    };
+  });
+}
+
+searchInput.addEventListener("input", e=>renderSuggestions(e.target.value));
+searchInput.addEventListener("focus", e=>{ if(e.target.value.trim()) renderSuggestions(e.target.value); });
+searchInput.addEventListener("keydown", e=>{ if(e.key==="Escape") closeSuggestions(); });
+clearBtn.addEventListener("click", ()=>{ searchInput.value=""; closeSuggestions(); searchInput.focus(); });
+document.addEventListener("click", e=>{
+  if(!e.target.closest(".search-shell")) closeSuggestions();
+});
+
+/* ---- boot ---- */
+renderHome();
+</script>
+</body>
+</html>
