@@ -303,91 +303,57 @@
   <main id="mainArea"></main>
 
   <footer>
-    <p><b>Disclaimer:</b> Every fund shown here is illustrative sample data for this demo build — not live NAVs, not real AMC filings. Rankings, scores, and the "AI Verdict" are generated from that sample data for informational purposes only and are not financial, investment, tax, or legal advice. Past performance never guarantees future returns — please do your own homework and talk to a registered financial advisor before investing.</p>
+    <p><b>Disclaimer:</b> Fund data on this site comes from the MF_Risk_Metrics dataset and reflects NAV history as of that dataset's last update — it is not a live market feed. Rankings, Composite Scores, and the "AI Verdict" are computed from that historical data for informational and educational purposes only and are not financial, investment, tax, or legal advice. Past performance never guarantees future returns — please do your own homework and talk to a registered financial advisor before investing.</p>
     <p class="footer-telugu telugu">నీ డబ్బులు, నీ నిర్ణయం — ఇది కేవలం ఒక సాధనం, సలహా కాదు.</p>
   </footer>
 </div>
 
 <script>
 /* =====================================================================
-   Sample dataset — illustrative numbers only, not real market data.
-   Mirrors the shape of the original MF_Risk_Metrics sheet: one row per
-   fund, grouped by Asset Type -> Sub Category, with return/risk metrics
-   at a few horizons plus a composite score used for ranking.
+   Real dataset — loaded from MF_Risk_Metrics.xlsx and pre-cleaned in
+   Python (mojibake repair, ELSS spelling merge, Growth/IDCW plan
+   dedup, asset-type inference). app.py replaces the marker below with
+   the actual JSON array at render time; when this file is opened
+   directly (not through Streamlit) the marker is left as an empty
+   array so the page still loads without erroring.
+   Each record: {name, amc, assetType, subCategoryRaw, subCategoryLabel,
+   nav, returns:{1D,6M,1Y,3Y,5Y}, risk:{vol,mdd,sharpe,sortino,calmar},
+   peerPctile, compositeScore, peerRank} — numeric fields may be null
+   when the underlying fund doesn't have enough history for that metric.
    ===================================================================== */
-const FUNDS = [
-  // ---- Equity: Large Cap Fund ----
-  fund("HDFC Top 100 Fund","HDFC Mutual Fund","Equity","Large Cap Fund",912.4,{"1D":0.004,"6M":0.081,"1Y":0.152,"3Y":0.148,"5Y":0.131},{vol:0.132,mdd:-0.181,sharpe:1.02,sortino:1.41,calmar:0.82},87,4),
-  fund("SBI Bluechip Fund","SBI Mutual Fund","Equity","Large Cap Fund",78.9,{"1D":0.003,"6M":0.076,"1Y":0.139,"3Y":0.135,"5Y":0.122},{vol:0.129,mdd:-0.176,sharpe:0.95,sortino:1.32,calmar:0.77},74,7),
-  fund("ICICI Prudential Bluechip Fund","ICICI Prudential Mutual Fund","Equity","Large Cap Fund",96.2,{"1D":0.004,"6M":0.089,"1Y":0.161,"3Y":0.155,"5Y":0.140},{vol:0.126,mdd:-0.163,sharpe:1.14,sortino:1.55,calmar:0.95},92,2),
-  fund("Axis Bluechip Fund","Axis Mutual Fund","Equity","Large Cap Fund",54.1,{"1D":0.002,"6M":0.062,"1Y":0.108,"3Y":0.098,"5Y":0.101},{vol:0.135,mdd:-0.199,sharpe:0.68,sortino:0.94,calmar:0.49},41,12),
+const FUNDS = /*__FUND_DATA_JSON__*/[]/*__END_FUND_DATA_JSON__*/;
 
-  // ---- Equity: Mid Cap Fund ----
-  fund("Kotak Emerging Equity Fund","Kotak Mutual Fund","Equity","Mid Cap Fund",112.6,{"1D":0.005,"6M":0.118,"1Y":0.221,"3Y":0.219,"5Y":0.184},{vol:0.187,mdd:-0.242,sharpe:1.05,sortino:1.38,calmar:0.90},88,3),
-  fund("Nippon India Growth Fund","Nippon India Mutual Fund","Equity","Mid Cap Fund",3241.0,{"1D":0.004,"6M":0.101,"1Y":0.198,"3Y":0.201,"5Y":0.176},{vol:0.191,mdd:-0.256,sharpe:0.94,sortino:1.24,calmar:0.78},76,6),
-  fund("PGIM India Midcap Opportunities Fund","PGIM India Mutual Fund","Equity","Mid Cap Fund",58.4,{"1D":0.001,"6M":0.052,"1Y":0.079,"3Y":0.061,"5Y":0.089},{vol:0.212,mdd:-0.311,sharpe:0.31,sortino:0.44,calmar:0.20},22,17),
+/* Precomputed once (not per keystroke): the distinct sub-categories the
+   loaded data actually contains, with their display label and asset
+   type — used by both the home directory and the search suggestions. */
+const CATEGORIES = (() => {
+  const seen = new Map();
+  FUNDS.forEach(f => {
+    if (!seen.has(f.subCategoryRaw)) {
+      seen.set(f.subCategoryRaw, { raw: f.subCategoryRaw, label: f.subCategoryLabel, assetType: f.assetType });
+    }
+  });
+  return [...seen.values()];
+})();
 
-  // ---- Equity: Small Cap Fund ----
-  fund("SBI Small Cap Fund","SBI Mutual Fund","Equity","Small Cap Fund",164.8,{"1D":0.006,"6M":0.142,"1Y":0.267,"3Y":0.258,"5Y":0.221},{vol:0.223,mdd:-0.279,sharpe:1.11,sortino:1.47,calmar:0.93},90,2),
-  fund("Axis Small Cap Fund","Axis Mutual Fund","Equity","Small Cap Fund",89.3,{"1D":0.005,"6M":0.121,"1Y":0.229,"3Y":0.234,"5Y":0.203},{vol:0.219,mdd:-0.268,sharpe:1.06,sortino:1.40,calmar:0.87},84,4),
-  fund("Quant Small Cap Fund","quant Mutual Fund","Equity","Small Cap Fund","240.7",{"1D":0.007,"6M":0.169,"1Y":0.298,"3Y":0.276,"5Y":0.239},{vol:0.241,mdd:-0.301,sharpe:1.09,sortino:1.44,calmar:0.92},89,3),
+/* ---- Asset Type -> Sub Category directory, built from CATEGORIES ---- */
+const ASSET_TYPE_ORDER = ["Equity","Debt","Hybrid","Index ETF","Solution Oriented","Other"];
 
-  // ---- Equity: Flexi Cap Fund ----
-  fund("Parag Parikh Flexi Cap Fund","PPFAS Mutual Fund","Equity","Flexi Cap Fund",83.5,{"1D":0.003,"6M":0.094,"1Y":0.178,"3Y":0.183,"5Y":0.169},{vol:0.141,mdd:-0.169,sharpe:1.28,sortino:1.72,calmar:1.05},95,1),
-  fund("HDFC Flexi Cap Fund","HDFC Mutual Fund","Equity","Flexi Cap Fund",1789.0,{"1D":0.004,"6M":0.088,"1Y":0.169,"3Y":0.171,"5Y":0.148},{vol:0.148,mdd:-0.184,sharpe:1.09,sortino:1.46,calmar:0.88},85,3),
-  fund("UTI Flexi Cap Fund","UTI Mutual Fund","Equity","Flexi Cap Fund",268.4,{"1D":0.001,"6M":0.041,"1Y":0.062,"3Y":0.051,"5Y":0.079},{vol:0.156,mdd:-0.238,sharpe:0.29,sortino:0.38,calmar:0.16},19,18),
-
-  // ---- Equity: ELSS ----
-  fund("Mirae Asset Tax Saver Fund","Mirae Asset Mutual Fund","Equity","ELSS",42.6,{"1D":0.004,"6M":0.092,"1Y":0.174,"3Y":0.176,"5Y":0.152},{vol:0.144,mdd:-0.177,sharpe:1.15,sortino:1.53,calmar:0.94},89,2),
-  fund("Axis Long Term Equity Fund","Axis Mutual Fund","Equity","ELSS",98.1,{"1D":0.002,"6M":0.058,"1Y":0.099,"3Y":0.089,"5Y":0.096},{vol:0.151,mdd:-0.221,sharpe:0.59,sortino:0.77,calmar:0.41},34,14),
-  fund("Quant ELSS Tax Saver Fund","quant Mutual Fund","Equity","ELSS",312.9,{"1D":0.006,"6M":0.131,"1Y":0.249,"3Y":0.231,"5Y":0.201},{vol:0.203,mdd:-0.263,sharpe:1.02,sortino:1.34,calmar:0.86},83,4),
-
-  // ---- Equity: Focused Fund ----
-  fund("SBI Focused Equity Fund","SBI Mutual Fund","Equity","Focused Fund",312.6,{"1D":0.003,"6M":0.071,"1Y":0.129,"3Y":0.121,"5Y":0.114},{vol:0.138,mdd:-0.192,sharpe:0.79,sortino:1.05,calmar:0.60},59,9),
-  fund("Axis Focused Fund","Axis Mutual Fund","Equity","Focused Fund",47.8,{"1D":0.002,"6M":0.049,"1Y":0.081,"3Y":0.068,"5Y":0.082},{vol:0.146,mdd:-0.229,sharpe:0.38,sortino:0.51,calmar:0.24},27,16),
-
-  // ---- Debt: Banking and PSU Fund ----
-  fund("HDFC Banking and PSU Debt Fund","HDFC Mutual Fund","Debt","Debt Scheme - Banking and PSU Fund",21.4,{"1D":0.0002,"6M":0.032,"1Y":0.069,"3Y":0.061,"5Y":0.067},{vol:0.021,mdd:-0.019,sharpe:1.31,sortino:1.98,calmar:2.85},81,2),
-  fund("Aditya Birla Sun Life Banking & PSU Debt Fund","Aditya Birla Sun Life Mutual Fund","Debt","Debt Scheme - Banking and PSU Fund",317.9,{"1D":0.0002,"6M":0.030,"1Y":0.065,"3Y":0.058,"5Y":0.064},{vol:0.023,mdd:-0.022,sharpe:1.19,sortino:1.76,calmar:2.41},72,3),
-
-  // ---- Debt: Corporate Bond Fund ----
-  fund("ICICI Prudential Corporate Bond Fund","ICICI Prudential Mutual Fund","Debt","Debt Scheme - Corporate Bond Fund",27.8,{"1D":0.0002,"6M":0.031,"1Y":0.068,"3Y":0.060,"5Y":0.066},{vol:0.019,mdd:-0.016,sharpe:1.38,sortino:2.05,calmar:3.02},86,1),
-  fund("HDFC Corporate Bond Fund","HDFC Mutual Fund","Debt","Debt Scheme - Corporate Bond Fund",30.1,{"1D":0.0002,"6M":0.029,"1Y":0.063,"3Y":0.057,"5Y":0.063},{vol:0.020,mdd:-0.018,sharpe:1.24,sortino:1.85,calmar:2.55},68,4),
-
-  // ---- Hybrid: Aggressive Hybrid Fund ----
-  fund("ICICI Prudential Equity & Debt Fund","ICICI Prudential Mutual Fund","Hybrid","Hybrid Scheme - Aggressive Hybrid Fund",412.5,{"1D":0.003,"6M":0.081,"1Y":0.156,"3Y":0.159,"5Y":0.139},{vol:0.109,mdd:-0.142,sharpe:1.22,sortino:1.63,calmar:1.02},91,1),
-  fund("SBI Equity Hybrid Fund","SBI Mutual Fund","Hybrid","Hybrid Scheme - Aggressive Hybrid Fund",289.4,{"1D":0.002,"6M":0.064,"1Y":0.118,"3Y":0.112,"5Y":0.107},{vol:0.101,mdd:-0.138,sharpe:0.97,sortino:1.28,calmar:0.79},70,3),
-
-  // ---- Hybrid: Balanced Advantage Fund ----
-  fund("HDFC Balanced Advantage Fund","HDFC Mutual Fund","Hybrid","Hybrid Scheme - Balanced Advantage Fund",412.9,{"1D":0.002,"6M":0.069,"1Y":0.131,"3Y":0.129,"5Y":0.118},{vol:0.093,mdd:-0.121,sharpe:1.18,sortino:1.55,calmar:1.06},88,1),
-  fund("Kotak Balanced Advantage Fund","Kotak Mutual Fund","Hybrid","Hybrid Scheme - Balanced Advantage Fund",21.6,{"1D":0.001,"6M":0.051,"1Y":0.094,"3Y":0.087,"5Y":0.084},{vol:0.086,mdd:-0.114,sharpe:0.86,sortino:1.11,calmar:0.72},58,4),
-
-  // ---- Index ETF: Nifty 50 Index Fund ----
-  fund("UTI Nifty 50 Index Fund","UTI Mutual Fund","Index ETF","Index Funds - Nifty 50 Index Fund",184.2,{"1D":0.003,"6M":0.072,"1Y":0.137,"3Y":0.134,"5Y":0.121},{vol:0.121,mdd:-0.171,sharpe:0.92,sortino:1.21,calmar:0.75},65,1),
-  fund("HDFC Index Fund Nifty 50 Plan","HDFC Mutual Fund","Index ETF","Index Funds - Nifty 50 Index Fund",213.9,{"1D":0.003,"6M":0.071,"1Y":0.136,"3Y":0.133,"5Y":0.120},{vol:0.121,mdd:-0.171,sharpe:0.91,sortino:1.20,calmar:0.74},63,2),
-
-  // ---- Index ETF: Sensex Index Fund ----
-  fund("SBI Sensex Index Fund","SBI Mutual Fund","Index ETF","Index Funds - Sensex Index Fund",22.3,{"1D":0.003,"6M":0.070,"1Y":0.132,"3Y":0.130,"5Y":0.118},{vol:0.119,mdd:-0.168,sharpe:0.90,sortino:1.18,calmar:0.73},61,1),
-];
-
-function fund(name,amc,assetType,subCategory,nav,returns,risk,peerPctile,peerRank){
-  return {name,amc,assetType,subCategory,nav:Number(nav),returns,risk,peerPctile,peerRank,
-    compositeScore: Math.round((peerPctile*0.7 + risk.sharpe*10)*10)/10 };
-}
-
-/* ---- Asset Type -> Sub Category directory, built from the data ---- */
 function buildDirectory(){
   const map = {};
-  FUNDS.forEach(f=>{
-    map[f.assetType] = map[f.assetType] || new Set();
-    map[f.assetType].add(f.subCategory);
+  CATEGORIES.forEach(c=>{
+    map[c.assetType] = map[c.assetType] || [];
+    map[c.assetType].push(c);
   });
-  const order = ["Equity","Debt","Hybrid","Index ETF"];
-  return order.filter(a=>map[a]).map(a=>({assetType:a, subs:[...map[a]].sort()}));
+  return ASSET_TYPE_ORDER.filter(a=>map[a]).map(a=>({
+    assetType:a,
+    subs:map[a].slice().sort((x,y)=>x.label.localeCompare(y.label))
+  }));
 }
 
-function subCatLabel(raw){
-  return raw.replace(/^Debt Scheme - /,"").replace(/^Hybrid Scheme - /,"").replace(/^Index Funds - /,"");
+function labelFor(subCategoryRaw){
+  const c = CATEGORIES.find(c=>c.raw===subCategoryRaw);
+  return c ? c.label : subCategoryRaw;
 }
 
 /* ---------------------------------------------------------------------
@@ -416,13 +382,9 @@ function searchSuggestions(query, limit=8){
     const s = Math.max(score(query,f.name), score(query, f.amc+" "+f.name));
     if(s >= 0.35) results.push({type:"fund", label:f.name, meta:f.amc, value:f.name, score:s});
   });
-  const seenCat = new Map();
-  FUNDS.forEach(f=>{
-    const label = subCatLabel(f.subCategory);
-    if(seenCat.has(label)) return;
-    seenCat.set(label, true);
-    const s = score(query, label);
-    if(s >= 0.35) results.push({type:"category", label, meta:f.assetType, value:f.subCategory, score:s});
+  CATEGORIES.forEach(c=>{
+    const s = score(query, c.label);
+    if(s >= 0.35) results.push({type:"category", label:c.label, meta:c.assetType, value:c.raw, score:s});
   });
   results.sort((a,b)=>b.score-a.score);
   return results.slice(0,limit);
@@ -437,11 +399,17 @@ const searchInput = document.getElementById("searchInput");
 const suggestBox = document.getElementById("suggestBox");
 const clearBtn = document.getElementById("clearBtn");
 
-document.getElementById("fundCountPill").textContent = FUNDS.length + " sample funds";
+document.getElementById("fundCountPill").textContent = FUNDS.length.toLocaleString("en-IN") + " funds tracked";
 
 function esc(s){ const d=document.createElement("div"); d.textContent=String(s); return d.innerHTML; }
-function pct(v,{annualised=false}={}){ return (v*100).toFixed(2)+"%"+(annualised?" p.a.":""); }
-function signClass(v){ return v>0?"pos":(v<0?"neg":""); }
+function pct(v,{annualised=false}={}){
+  if(v===null || v===undefined || Number.isNaN(v)) return "—";
+  return (v*100).toFixed(2)+"%"+(annualised?" p.a.":"");
+}
+function numOr(v, digits=2, fallback="—"){
+  return (v===null || v===undefined || Number.isNaN(v)) ? fallback : v.toFixed(digits);
+}
+function signClass(v){ return (v!==null && v!==undefined && v>0)?"pos":((v!==null && v!==undefined && v<0)?"neg":""); }
 
 function renderBack(show){
   backSlot.innerHTML = show
@@ -464,7 +432,7 @@ function renderHome(){
     html += `<details class="asset-card"><summary>${esc(d.assetType)}<span class="count">${d.subs.length} categories</span></summary>
       <div class="subcat-list">`;
     d.subs.forEach(sc=>{
-      html += `<button class="subcat-btn" data-cat="${esc(sc)}">${esc(subCatLabel(sc))}</button>`;
+      html += `<button class="subcat-btn" data-cat="${esc(sc.raw)}">${esc(sc.label)}</button>`;
     });
     html += `</div></details>`;
   });
@@ -479,8 +447,8 @@ const TOP_N = 2;
 
 function openCategory(subCategory, showAll){
   renderBack(true);
-  const label = subCatLabel(subCategory);
-  const all = FUNDS.filter(f=>f.subCategory===subCategory)
+  const label = labelFor(subCategory);
+  const all = FUNDS.filter(f=>f.subCategoryRaw===subCategory)
                     .slice()
                     .sort((a,b)=>b.compositeScore-a.compositeScore);
   const subset = showAll ? all : all.slice(0, TOP_N);
@@ -529,6 +497,13 @@ function openCategory(subCategory, showAll){
 }
 
 function buildVerdict(f){
+  const hasFullHistory = f.risk.sharpe!==null && f.risk.sharpe!==undefined && f.peerPctile!==null;
+  if(!hasFullHistory){
+    return {
+      verdict: "NEUTRAL",
+      body: `This fund doesn't have enough 3-year history yet for a full risk read (no Sharpe ratio or peer-percentile rank on record). Its Composite Score of ${numOr(f.compositeScore,1)} is based on whatever horizons are available — worth checking back once it has a longer track record, or comparing it against a more established fund in the same category.`
+    };
+  }
   const s = f.compositeScore;
   let verdict = "NEUTRAL";
   if(s>=80) verdict="INVEST"; else if(s<=45) verdict="AVOID";
@@ -536,13 +511,14 @@ function buildVerdict(f){
   const vol = pct(f.risk.vol);
   const mdd = pct(f.risk.mdd);
   const pctile = f.peerPctile + "th percentile";
+  const sharpe = numOr(f.risk.sharpe);
   let body;
   if(verdict==="INVEST"){
-    body = `Over the past 3 years this fund has compounded at roughly ${cagr3y}, with a Sharpe ratio of ${f.risk.sharpe.toFixed(2)} that suggests the return has come with reasonably controlled risk. Its worst drawdown of ${mdd} is manageable for the category, and it ranks in the ${pctile} against peers on the blended score. Volatility sits around ${vol}, in line with what's typical for ${subCatLabel(f.subCategory)} funds.`;
+    body = `Over the past 3 years this fund has compounded at roughly ${cagr3y}, with a Sharpe ratio of ${sharpe} that suggests the return has come with reasonably controlled risk. Its worst drawdown of ${mdd} is manageable for the category, and it ranks in the ${pctile} against peers on the blended score. Volatility sits around ${vol}, in line with what's typical for ${labelFor(f.subCategoryRaw)} funds.`;
   } else if(verdict==="AVOID"){
-    body = `The 3-year CAGR of ${cagr3y} has come with a drawdown of ${mdd} and a Sharpe ratio of only ${f.risk.sharpe.toFixed(2)} — the return hasn't compensated well for the risk taken. It sits in the ${pctile} against category peers, on the lower side of the pack. Volatility of ${vol} is also on the higher end for this category.`;
+    body = `The 3-year CAGR of ${cagr3y} has come with a drawdown of ${mdd} and a Sharpe ratio of only ${sharpe} — the return hasn't compensated well for the risk taken. It sits in the ${pctile} against category peers, on the lower side of the pack. Volatility of ${vol} is also on the higher end for this category.`;
   } else {
-    body = `Numbers here are mixed: a 3-year CAGR of ${cagr3y} against a drawdown of ${mdd} and a Sharpe ratio of ${f.risk.sharpe.toFixed(2)} don't clearly lean either way. It's placed in the ${pctile} against peers — middling rather than standout. Worth weighing against your own goals and time horizon rather than the numbers alone.`;
+    body = `Numbers here are mixed: a 3-year CAGR of ${cagr3y} against a drawdown of ${mdd} and a Sharpe ratio of ${sharpe} don't clearly lean either way. It's placed in the ${pctile} against peers — middling rather than standout. Worth weighing against your own goals and time horizon rather than the numbers alone.`;
   }
   return {verdict, body};
 }
@@ -550,14 +526,14 @@ function buildVerdict(f){
 function openFund(name){
   renderBack(true);
   const f = FUNDS.find(x=>x.name===name);
-  if(!f){ mainArea.innerHTML = `<p class="empty-note">Couldn't find "${esc(name)}" in the sample dataset.</p>`; return; }
+  if(!f){ mainArea.innerHTML = `<p class="empty-note">Couldn't find "${esc(name)}" in the dataset.</p>`; return; }
 
   let html = `<h2 class="profile-title">${esc(f.name)}</h2>
     <p class="profile-sub">${esc(f.amc)}</p>
     <ul class="basic-list">
-      <li><b>Category:</b> ${esc(subCatLabel(f.subCategory))}</li>
+      <li><b>Category:</b> ${esc(f.subCategoryLabel)}</li>
       <li><b>Asset Type:</b> ${esc(f.assetType)}</li>
-      <li><b>Latest NAV:</b> ₹${f.nav.toFixed(2)}</li>
+      <li><b>Latest NAV:</b> ${f.nav!==null ? "₹"+f.nav.toFixed(2) : "—"}</li>
     </ul>
 
     <div class="section-label" style="margin-top:0;">Performance &amp; Risk by Horizon</div>
@@ -580,21 +556,21 @@ function openFund(name){
         <li>Absolute Return: ${pct(v)}</li>
         ${key==="3Y"||key==="5Y" ? `<li>Volatility (Std. Dev.): ${pct(f.risk.vol)}</li>
         <li>Max Drawdown: ${pct(f.risk.mdd)}</li>
-        <li>Sharpe Ratio: ${f.risk.sharpe.toFixed(2)}</li>
-        <li>Sortino Ratio: ${f.risk.sortino.toFixed(2)}</li>
-        <li>Calmar Ratio: ${f.risk.calmar.toFixed(2)}</li>` : ``}
+        <li>Sharpe Ratio: ${numOr(f.risk.sharpe)}</li>
+        <li>Sortino Ratio: ${numOr(f.risk.sortino)}</li>
+        <li>Calmar Ratio: ${numOr(f.risk.calmar)}</li>` : ``}
       </ul>
     </details>`;
   });
 
-  html += `<p class="score-line">Composite Score: ${f.compositeScore} &middot; Peer Rank: #${f.peerRank}</p>`;
+  html += `<p class="score-line">Composite Score: ${numOr(f.compositeScore,1)} &middot; Peer Rank: #${f.peerRank ?? "—"}</p>`;
 
   const {verdict, body} = buildVerdict(f);
   html += `<div class="section-label" style="margin-top:8px;">AI Verdict</div>
     <div class="verdict-card">
       <span class="verdict-badge ${verdict}">${verdict}</span>
       <p class="verdict-body">${esc(body)}</p>
-      <p class="verdict-disclaimer">Automated read of this sample's historical numbers only — not personalised financial advice. Please consider your own goals and horizon, and talk to a registered advisor before investing.</p>
+      <p class="verdict-disclaimer">Automated, rule-based read of this fund's historical numbers only — not a live AI model call, and not personalised financial advice. Please consider your own goals and horizon, and talk to a registered advisor before investing.</p>
     </div>`;
 
   mainArea.innerHTML = html;
@@ -614,7 +590,7 @@ function renderSuggestions(query){
   clearBtn.classList.add("show");
   const results = searchSuggestions(query);
   if(!results.length){
-    suggestBox.innerHTML = `<div class="suggest-empty">No matching fund or category in the sample data. Try a category like "Small Cap" or "ELSS".</div>`;
+    suggestBox.innerHTML = `<div class="suggest-empty">No matching fund or category found. Try a category like "Small Cap" or "ELSS", or an AMC name like "HDFC".</div>`;
     suggestBox.hidden = false;
     return;
   }
