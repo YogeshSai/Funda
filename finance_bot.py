@@ -300,7 +300,11 @@ def _is_growth_variant(name: str) -> bool:
 def dedup_funds(df: pd.DataFrame) -> pd.DataFrame:
     """Collapse rows that represent the same underlying fund under
     different plan-options (Growth/IDCW/Dividend/...) down to one row
-    each, keeping the Growth variant when one is present."""
+    each, keeping the Growth variant when one is present. Direct and
+    Regular plans are deliberately kept as separate rows here -- they
+    have different expense ratios and are genuinely different
+    investable products. See dedup_funds_keep_direct() below for the
+    site's actual display behaviour, which collapses those too."""
     if df.empty or "Scheme Name" not in df.columns:
         return df
     work = df.copy()
@@ -310,6 +314,54 @@ def dedup_funds(df: pd.DataFrame) -> pd.DataFrame:
     work = work.sort_values("_is_growth", ascending=False, kind="stable")
     work = work.drop_duplicates(subset="_dedup_key", keep="first")
     return work.drop(columns=["_dedup_key", "_is_growth"])
+
+
+# ----------------------------------------------------------------------
+# Further collapsing Direct vs Regular plan down to a single row per
+# fund -- the site shows only ONE row per underlying fund, preferring
+# the Direct plan (lower expense ratio, what most retail investors
+# should be looking at). A fund that only has a Regular plan on record
+# (no Direct option exists for it) still shows up via that Regular
+# row -- it's never dropped outright, only de-prioritized.
+# ----------------------------------------------------------------------
+_PLAN_PHRASES = ["direct plan", "regular plan", "direct", "regular"]
+
+
+def _is_direct_variant(name: str) -> bool:
+    return "direct" in str(name).lower()
+
+
+def _fund_identity_key(name: str) -> str:
+    """Like _fund_dedup_key, but with the Direct/Regular plan phrase
+    ALSO stripped out, so different plans of the same underlying fund
+    collapse to one identity. Used only by dedup_funds_keep_direct() --
+    dedup_funds() above still needs Direct/Regular kept apart for
+    callers that want both plans distinguished."""
+    text = _fund_dedup_key(name)
+    for phrase in _PLAN_PHRASES:
+        text = re.sub(r"\b" + re.escape(phrase) + r"\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"[-,]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def dedup_funds_keep_direct(df: pd.DataFrame) -> pd.DataFrame:
+    """Collapse each underlying fund (across BOTH payout option and
+    plan type) down to a single row, preferring: Direct plan over
+    Regular, and within that, Growth over IDCW/Dividend. A fund that
+    only exists as a Regular-plan row in the sheet is still kept (via
+    that row) rather than dropped -- preference, not a filter."""
+    if df.empty or "Scheme Name" not in df.columns:
+        return df
+    work = df.copy()
+    work["_identity_key"] = work["Scheme Name"].apply(_fund_identity_key)
+    work["_is_direct"] = work["Scheme Name"].apply(_is_direct_variant)
+    work["_is_growth"] = work["Scheme Name"].apply(_is_growth_variant)
+    work = work.sort_values(
+        ["_is_direct", "_is_growth"], ascending=[False, False], kind="stable"
+    )
+    work = work.drop_duplicates(subset="_identity_key", keep="first")
+    return work.drop(columns=["_identity_key", "_is_direct", "_is_growth"])
 
 
 # ----------------------------------------------------------------------
@@ -1040,7 +1092,7 @@ class FinanceBot:
             if subset.empty:
                 return subset
 
-        subset = dedup_funds(subset)
+        subset = dedup_funds_keep_direct(subset)
 
         # Only one fund per AMC in the displayed set -- if two funds from the
         # same fund house both qualify, keep just the better-ranked one
