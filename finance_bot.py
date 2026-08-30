@@ -275,10 +275,21 @@ def _fund_dedup_key(name: str) -> str:
     text = str(name).lower()
     for phrase in _OPTION_PHRASES:
         text = re.sub(re.escape(phrase), " ", text, flags=re.IGNORECASE)
-    # Leftover punctuation from a fully-stripped phrase, e.g. "(  )" or
-    # a trailing "- -", would otherwise stop two variants' keys matching.
     text = re.sub(r"[()]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip(" -")
+    # Removing an option phrase leaves a stray separator (usually a "-")
+    # behind wherever the phrase used to sit -- e.g. "Fund - IDCW - Direct
+    # Plan" becomes "fund -   - direct plan" after stripping "idcw", while
+    # "Fund - Direct Plan - Growth" becomes "fund - direct plan -  " after
+    # stripping "growth". Only trimming LEADING/TRAILING dashes (the old
+    # behaviour) left an interior "-" in the first case but not the
+    # second, so the two keys came out different even though they name
+    # the same underlying fund -- and IDCW rows survived dedup instead of
+    # collapsing into their Growth counterpart. Stripping every dash/comma
+    # separator (not just the ones at the ends) before collapsing
+    # whitespace makes the key independent of where in the name the
+    # option phrase happened to appear.
+    text = re.sub(r"[-,]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
     return text
 
 
