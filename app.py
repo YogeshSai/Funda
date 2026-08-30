@@ -40,7 +40,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-from finance_bot import FinanceBot, clean_subcat_label, dedup_funds, subcat_browse_label
+from finance_bot import FinanceBot, clean_subcat_label, dedup_funds_keep_direct, subcat_browse_label
 
 st.set_page_config(page_title="FundFinder", page_icon="📈", layout="wide")
 
@@ -122,7 +122,11 @@ def _build_category_lookups(bot: FinanceBot) -> tuple[dict, dict]:
 
 
 def build_fund_records(bot: FinanceBot) -> list[dict]:
-    df = dedup_funds(bot.df.copy())
+    # Collapses both payout-option variants (Growth/IDCW/Dividend) AND
+    # plan-type variants (Direct/Regular) down to one row per underlying
+    # fund, preferring Direct -- so the site shows a single listing per
+    # fund rather than one row per plan.
+    df = dedup_funds_keep_direct(bot.df.copy())
     canonical_raw_by_label, asset_type_by_raw = _build_category_lookups(bot)
 
     records = []
