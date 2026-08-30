@@ -1,0 +1,6 @@
+streamlit>=1.35
+pandas>=2.0
+openpyxl>=3.1
+groq>=0.9
+spacy>=3.7,<4
+rapidfuzz>=3.6,<4
