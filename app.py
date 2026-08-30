@@ -92,29 +92,52 @@ def _num_or_none(v):
     return f
 
 
-def _build_asset_type_lookup(bot: FinanceBot) -> dict:
-    """Invert FinanceBot's Asset Type -> [Sub Category,...] map so every
-    raw Sub Category value in the dataset can be looked up directly.
-    Falls back to the row's own Asset Class for any Sub Category that
-    the directory-building step didn't end up assigning (e.g. when two
-    raw values collapse to the same cleaned label and only one is kept
-    as that label's representative)."""
-    lookup = {}
+def _build_category_lookups(bot: FinanceBot) -> tuple[dict, dict]:
+    """FinanceBot's own asset_type_to_subcats already solved the
+    "duplicate Sub Category" problem for its directory: for every
+    cleaned label (e.g. "Large Cap Fund"), it picks ONE representative
+    raw Sub Category value to stand in for every raw variant that
+    cleans down to that label (e.g. both an "Open Ended Schemes(...)"
+    and a "Close Ended Schemes(...)" raw string).
+
+    fundfinder.html's own CATEGORIES step, though, groups funds by
+    whatever raw subCategoryRaw string each record carries -- so if we
+    send each fund's *original* raw value through, every raw variant
+    still shows up as its own category client-side, even though the
+    labels are identical. The fix: re-key every fund onto that same
+    representative raw value (by cleaned label) before it ever reaches
+    the JSON, so the JS's per-raw-value grouping produces the same
+    deduped result FinanceBot's own directory does.
+
+    Returns (label -> canonical raw value, canonical raw value -> asset type).
+    """
+    canonical_raw_by_label: dict = {}
+    asset_type_by_raw: dict = {}
     for asset_type, subcats in bot.asset_type_to_subcats.items():
         for sc in subcats:
-            lookup[sc] = asset_type
-    return lookup
+            label = subcat_browse_label(sc)
+            canonical_raw_by_label.setdefault(label, sc)
+            asset_type_by_raw[sc] = asset_type
+    return canonical_raw_by_label, asset_type_by_raw
 
 
 def build_fund_records(bot: FinanceBot) -> list[dict]:
     df = dedup_funds(bot.df.copy())
-    asset_type_lookup = _build_asset_type_lookup(bot)
+    canonical_raw_by_label, asset_type_by_raw = _build_category_lookups(bot)
 
     records = []
     for _, row in df.iterrows():
         sub_cat_raw = row.get("Sub Category")
         if pd.isna(sub_cat_raw):
             continue
+
+        # Re-key onto the canonical raw value for this category's
+        # cleaned label -- see _build_category_lookups above. Falls
+        # back to the row's own raw value if its label somehow isn't
+        # in the map (shouldn't happen, but keeps a fund visible
+        # rather than dropping it).
+        label = subcat_browse_label(sub_cat_raw)
+        sub_cat_raw = canonical_raw_by_label.get(label, sub_cat_raw)
 
         returns = {}
         for horizon in RETURN_HORIZONS:
@@ -133,9 +156,9 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
         records.append({
             "name": str(row.get("Scheme Name", "")),
             "amc": str(row.get("AMC (Fund House)", "")) if not pd.isna(row.get("AMC (Fund House)")) else "",
-            "assetType": asset_type_lookup.get(sub_cat_raw, str(row.get("Asset Class", "Other"))),
+            "assetType": asset_type_by_raw.get(sub_cat_raw, str(row.get("Asset Class", "Other"))),
             "subCategoryRaw": str(sub_cat_raw),
-            "subCategoryLabel": subcat_browse_label(sub_cat_raw),
+            "subCategoryLabel": label,
             "nav": _num_or_none(row.get("Latest NAV")),
             "returns": returns,
             "risk": {
