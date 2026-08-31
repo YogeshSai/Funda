@@ -284,6 +284,25 @@ _FREQUENCY_PHRASES = [
     "monthly", "weekly", "daily", "annual", "periodic",
 ]
 
+# ----------------------------------------------------------------------
+# Dash-character normalization for dedup keys
+# ----------------------------------------------------------------------
+# Scheme Names in the sheet are NOT consistent about which dash
+# character separates "Fund - Direct Plan - Growth" -- most rows use a
+# plain ASCII hyphen ("-"), but a fair number use a typographic en dash
+# ("\u2013"), em dash ("\u2014"), or (rarely) a true minus sign
+# ("\u2212") instead, sometimes even mixing them within the same name
+# (e.g. "Motilal Oswal Contra Fund - Direct \u2013 Growth"). Left
+# unnormalized, _fund_dedup_key/_fund_identity_key below strip the
+# *word* between dashes (e.g. "growth") but leave a stray non-ASCII
+# dash character sitting in the key -- so two rows naming the exact same
+# underlying fund/plan/option ended up with DIFFERENT keys purely
+# because of which dash glyph was typed, and silently survived dedup as
+# two (or three) separate "funds" instead of collapsing into one with
+# its variants nested underneath. Normalizing every dash-like character
+# to a plain "-" before any other processing fixes this at the source.
+_DASH_CHARS_RE = re.compile("[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]")
+
 
 def _fund_dedup_key(name: str) -> str:
     """Normalized identity for a fund, with the plan-option phrase (Growth /
@@ -294,9 +313,21 @@ def _fund_dedup_key(name: str) -> str:
     same key. 'Direct'/'Regular Plan' is deliberately kept, since those ARE
     genuinely different funds/TERs."""
     text = str(name).lower()
+    # Normalize dash variants FIRST (see _DASH_CHARS_RE above) so the
+    # separator-collapsing step near the end of this function catches
+    # every dash glyph the sheet might use, not just the ASCII hyphen.
+    text = _DASH_CHARS_RE.sub("-", text)
     for phrase in _OPTION_PHRASES + _FREQUENCY_PHRASES:
         text = re.sub(re.escape(phrase), " ", text, flags=re.IGNORECASE)
-    text = re.sub(r"[()]", " ", text)
+    # "(" ")" and "/" are all separators that can surround a stripped
+    # option phrase -- e.g. "IDCW (Payout / Reinvestment)" leaves a
+    # stray "/" behind once "payout" and "reinvestment" are removed by
+    # the loop above. Left in place, that stray "/" -- like the
+    # unnormalized dash issue above -- produced a different key than the
+    # same fund's Growth row and kept the two from collapsing. All three
+    # characters are folded into a space here, alongside the dash
+    # separator collapsing on the next line.
+    text = re.sub(r"[()/]", " ", text)
     # Removing an option phrase leaves a stray separator (usually a "-")
     # behind wherever the phrase used to sit -- e.g. "Fund - IDCW - Direct
     # Plan" becomes "fund -   - direct plan" after stripping "idcw", while
@@ -1049,7 +1080,7 @@ class FinanceBot:
     # ------------------------------------------------------------------
     # Sub-category matching -- fuzzy, highest-score based (no exact text
     # required). Matching runs against the *cleaned* display label (the
-    # "Open/Close Ended Schemes(...)" wrapper stripped out), not the raw
+    # "Open/Close Ended Schemes" wrapper stripped out), not the raw
     # dataset string. Comparing against the raw value let its wrapper text
     # dilute the old character-sequence ratio -- a long, correct raw value
     # like "Open Ended Schemes(Equity Scheme - Small Cap Fund)" could
