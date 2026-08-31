@@ -400,6 +400,9 @@ _FREQUENCY_RE = re.compile(
     r"\b(half[\s-]?yearly|fortnightly|quarterly|monthly|weekly|daily|annual|periodic)\b",
     re.IGNORECASE,
 )
+_IDCW_FULL_NAME_RE = re.compile(
+    r"income\s+distribution\s+cum\s+capital\s+withdrawal", re.IGNORECASE
+)
 
 
 def describe_variant_label(name: str) -> str:
@@ -421,6 +424,47 @@ def describe_variant_label(name: str) -> str:
         option = "Other"
 
     return f"{plan} - {option}" if plan else option
+
+
+def describe_variant_fields(name: str) -> dict:
+    """Structured breakdown of a Scheme Name into its three purchasable
+    dimensions, for display as separate "Plan / Option / IDCW frequency"
+    fields rather than one flattened label string:
+
+      - plan:      "Direct" | "Regular" | "" (unknown)
+      - option:    "Growth" | "IDCW" | "Dividend" |
+                   "Income Distribution cum Capital Withdrawal" | "Other"
+      - frequency: "Daily" | "Weekly" | "Monthly" | "Quarterly" | ... | ""
+                   (only ever set when option is an IDCW-type payout)
+
+    Used by format_fund_profile() (grouped "Available Plans & Options"
+    section) and by app.py's build_fund_records() (per-fund "plans" list
+    sent to the website) so both surfaces show the same breakdown instead
+    of re-deriving it themselves ad hoc.
+    """
+    text = str(name)
+    lower = text.lower()
+
+    plan = "Direct" if "direct" in lower else ("Regular" if "regular" in lower else "")
+
+    if _IDCW_FULL_NAME_RE.search(lower):
+        option = "Income Distribution cum Capital Withdrawal"
+    elif "idcw" in lower:
+        option = "IDCW"
+    elif "dividend" in lower:
+        option = "Dividend"
+    elif "growth" in lower:
+        option = "Growth"
+    else:
+        option = "Other"
+
+    frequency = ""
+    if option in ("IDCW", "Dividend", "Income Distribution cum Capital Withdrawal"):
+        freq_match = _FREQUENCY_RE.search(lower)
+        if freq_match:
+            frequency = freq_match.group(1).title()
+
+    return {"plan": plan, "option": option, "frequency": frequency}
 
 
 def group_funds_with_variants(df: pd.DataFrame) -> list[dict]:
@@ -1140,6 +1184,25 @@ class FinanceBot:
     # ------------------------------------------------------------------
     # Fund name matching
     # ------------------------------------------------------------------
+    def get_fund_group(self, scheme_name: str) -> tuple[pd.Series, list[pd.Series]]:
+        """Given an exact Scheme Name, return (row, siblings) where
+        siblings is every OTHER row in the full dataset that represents a
+        different Plan/Option/IDCW-frequency of the SAME underlying fund
+        (matched via _fund_identity_key, the same identity key
+        group_funds_with_variants() uses). Lets format_fund_profile()
+        show the full "Available Plans & Options" breakdown for a fund
+        looked up through the conversational respond()/detect_intent path,
+        not just the website's own JSON-record path (app.py already does
+        this grouping itself via group_funds_with_variants())."""
+        match = self.df[self.df["Scheme Name"] == scheme_name]
+        if match.empty:
+            raise FundNotFoundError(f"No fund matching '{scheme_name}' found in the dataset.")
+        row = match.iloc[0]
+        key = _fund_identity_key(scheme_name)
+        same_family = self.df[self.df["Scheme Name"].apply(_fund_identity_key) == key]
+        siblings = [r for _, r in same_family.iterrows() if r["Scheme Name"] != scheme_name]
+        return row, siblings
+
     def match_fund(self, query: str) -> pd.Series:
         q = query.strip().lower()
         if not q:
@@ -1274,7 +1337,7 @@ class FinanceBot:
     # Top-N funds in a sub-category
     # ------------------------------------------------------------------
     def top_funds(
-        self, sub_category: str, n: int = 10, sort_by: str = "Peer_Rank",
+        self, sub_category: str, n: int = 5, sort_by: str = "Peer_Rank",
         amc: str | None = None,
     ) -> pd.DataFrame:
         subset = self.df[self.df["Sub Category"] == sub_category].copy()
@@ -1337,7 +1400,7 @@ class FinanceBot:
                 resolved.append((fallback, label))
         return resolved
 
-    def format_top_funds(self, sub_category: str, n: int = 10, amc: str | None = None) -> str:
+    def format_top_funds(self, sub_category: str, n: int = 5, amc: str | None = None) -> str:
         subset = self.top_funds(sub_category, n=n, amc=amc)
         cat_label = clean_subcat_label(sub_category)
         if subset.empty:
@@ -1519,23 +1582,58 @@ class FinanceBot:
                 bits.append(f"**Peer Rank:** #{int(peer_rank)}")
             out.append(" · ".join(bits))
 
-        # Additional investment options -- other purchasable Plan/Option
-        # combinations of this SAME underlying fund (Regular plan, IDCW
-        # payout frequencies, etc.) that were folded out of the primary
-        # listing above by group_funds_with_variants(). Shown as a plain
-        # sub-heading + list rather than duplicate top-level fund cards,
-        # so the site shows one fund per underlying portfolio while still
-        # surfacing every way it can actually be bought.
-        if variants:
+        # Available Plans & Options -- EVERY purchasable Plan/Option/
+        # frequency combination of this underlying fund, including the
+        # one currently being viewed (row itself), grouped by Plan so
+        # the structure reads as:
+        #   Direct Plan
+        #     - Growth
+        #     - Monthly IDCW
+        #   Regular Plan
+        #     - Growth
+        #     - Income Distribution cum Capital Withdrawal (Quarterly)
+        # rather than a flat "Additional investment options" list that
+        # only covered the OTHER rows and omitted the primary's own
+        # plan/option from the same structured breakdown.
+        all_rows = [row] + list(variants or [])
+        if len(all_rows) > 1:
             out.append("")
-            out.append("**Additional investment options**")
-            out.append('<div class="ff-hint">Same underlying fund, different Plan/Option.</div>')
+            out.append("**Available Plans & Options**")
+            out.append('<div class="ff-hint">Same underlying fund — pick the Plan/Option you hold or want to invest in.</div>')
             out.append("")
-            for variant in variants:
-                v_label = describe_variant_label(variant["Scheme Name"])
-                v_nav = variant.get("Latest NAV")
-                nav_bit = f" — NAV {fmt(v_nav)}" if not pd.isna(v_nav) else ""
-                out.append(f"- **{v_label}**{nav_bit}")
+
+            by_plan: dict[str, list[tuple[pd.Series, dict]]] = {}
+            for r in all_rows:
+                fields = describe_variant_fields(r["Scheme Name"])
+                plan_key = fields["plan"] or "Other"
+                by_plan.setdefault(plan_key, []).append((r, fields))
+
+            # Direct first (what most retail investors want), then
+            # Regular, then anything unclassified.
+            plan_order = [p for p in ("Direct", "Regular") if p in by_plan]
+            plan_order += [p for p in by_plan if p not in plan_order]
+
+            out.append('<div class="ff-plans">')
+            for plan_key in plan_order:
+                out.append('<div class="ff-plan-group">')
+                out.append(f'<div class="ff-plan-title">{html.escape(plan_key)} Plan</div>')
+                for r, fields in by_plan[plan_key]:
+                    option = fields["option"]
+                    freq = fields["frequency"]
+                    option_label = f"{freq} {option}" if freq else option
+                    is_current = r["Scheme Name"] == row["Scheme Name"]
+                    nav_val = r.get("Latest NAV")
+                    nav_bit = f" — NAV {fmt(nav_val)}" if not pd.isna(nav_val) else ""
+                    current_tag = ' <span class="ff-current-tag">(viewing)</span>' if is_current else ""
+                    out.append(
+                        '<div class="ff-plan-option">'
+                        f'<span class="ff-plan-option-label">{html.escape(option_label)}</span>'
+                        f'<span class="ff-plan-option-nav">{nav_bit}</span>'
+                        f'{current_tag}'
+                        "</div>"
+                    )
+                out.append("</div>")
+            out.append("</div>")
 
         # AI Verdict is always rendered as a standard section on every
         # fund's profile -- not just when a summarizer happens to be
@@ -1634,7 +1732,7 @@ class FinanceBot:
                         self._render_prompt("Please pick a Sub Category")
                     )
             self.pending = None
-            return self.format_top_funds(choice, n=10)
+            return self.format_top_funds(choice, n=5)
 
         if stage == "await_fund_choice":
             options = self.pending["options"]
@@ -1648,7 +1746,8 @@ class FinanceBot:
             match = self.df[self.df["Scheme Name"] == choice]
             if match.empty:
                 return f"I couldn't find '{choice}' in the dataset."
-            return self.format_fund_profile(match.iloc[0], fund_summarizer=fund_summarizer)
+            row, variants = self.get_fund_group(choice)
+            return self.format_fund_profile(row, fund_summarizer=fund_summarizer, variants=variants)
 
         self.pending = None
         return None
@@ -1675,7 +1774,7 @@ class FinanceBot:
             m = re.search(pat, ql)
             if m:
                 groups = m.groups()
-                n = 10
+                n = 5
                 cat_text = None
                 for g in groups:
                     if g and g.isdigit():
@@ -1711,7 +1810,7 @@ class FinanceBot:
         if not generic_question:
             best_sc, score = self.best_sub_category_match(q_wo_amc)
             if best_sc and score >= SUBCAT_MATCH_THRESHOLD:
-                return "top_funds", {"category_text": q_wo_amc, "n": 10, "amc": amc}
+                return "top_funds", {"category_text": q_wo_amc, "n": 5, "amc": amc}
         else:
             best_sc, score = None, 0.0
 
@@ -1742,7 +1841,7 @@ class FinanceBot:
             if not best_sc or score < SUBCAT_MATCH_THRESHOLD:
                 return self.start_asset_type_flow()
             amc = params.get("amc")
-            return self.format_top_funds(best_sc, n=params.get("n", 10), amc=amc)
+            return self.format_top_funds(best_sc, n=params.get("n", 5), amc=amc)
 
         if intent == "fund_info":
             fund_text = params["fund_text"]
@@ -1750,12 +1849,14 @@ class FinanceBot:
                 self.df["Scheme Name"].str.lower() == fund_text.strip().lower()
             ]
             if not exact.empty:
-                return self.format_fund_profile(exact.iloc[0], fund_summarizer=fund_summarizer)
+                row, variants = self.get_fund_group(exact.iloc[0]["Scheme Name"])
+                return self.format_fund_profile(row, fund_summarizer=fund_summarizer, variants=variants)
             candidates = self.match_funds_ranked(fund_text, n=6)
             if candidates.empty:
                 return f"I couldn't find a fund matching '{fund_text}' in the dataset."
             if len(candidates) == 1:
-                return self.format_fund_profile(candidates.iloc[0], fund_summarizer=fund_summarizer)
+                row, variants = self.get_fund_group(candidates.iloc[0]["Scheme Name"])
+                return self.format_fund_profile(row, fund_summarizer=fund_summarizer, variants=variants)
             self.pending = {
                 "stage": "await_fund_choice",
                 "options": candidates["Scheme Name"].tolist(),
