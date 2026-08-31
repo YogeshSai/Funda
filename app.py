@@ -43,6 +43,7 @@ import streamlit.components.v1 as components
 from finance_bot import (
     FinanceBot,
     clean_subcat_label,
+    describe_variant_fields,
     describe_variant_label,
     group_funds_with_variants,
     subcat_browse_label,
@@ -78,6 +79,15 @@ RETURN_FALLBACK_COL = {
     "3Y": "3Y_CAGR",
     "5Y": "5Y_CAGR",
 }
+
+# How many funds to show per Sub Category / AMC combo on the site's
+# category and search-result screens. See TOP_N_PER_CATEGORY below --
+# the actual "top N" cut is applied client-side in fundfinder.html, but
+# every record carries a peerRank/compositeScore so the JS can sort and
+# slice consistently with this number. Kept here as the single source
+# of truth so a future JS change can read it via the injected JSON
+# instead of a second hardcoded constant.
+TOP_N_PER_CATEGORY = 5
 
 
 def _num_or_none(v):
@@ -148,6 +158,18 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
             returns[horizon] = _num_or_none(row.get(col)) if col else None
         return returns
 
+    def _plan_entry(r, is_current: bool) -> dict:
+        fields = describe_variant_fields(r.get("Scheme Name", ""))
+        return {
+            "name": str(r.get("Scheme Name", "")),
+            "plan": fields["plan"],           # "Direct" | "Regular" | ""
+            "option": fields["option"],       # "Growth" | "IDCW" | "Dividend" |
+                                               # "Income Distribution cum Capital Withdrawal" | "Other"
+            "frequency": fields["frequency"],  # "Daily" | "Weekly" | "Monthly" | "Quarterly" | ... | ""
+            "nav": _num_or_none(r.get("Latest NAV")),
+            "isCurrent": is_current,
+        }
+
     records = []
     for group in groups:
         row = group["primary"]
@@ -182,6 +204,18 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
             for v in group["variants"]
         ]
 
+        # Structured Plan / Option / IDCW-frequency breakdown for EVERY
+        # purchasable combination of this underlying fund, including the
+        # primary row itself (isCurrent=True) -- lets the site render a
+        # "Plan: Direct/Regular", "Option: Growth/IDCW/Dividend/...",
+        # "IDCW frequency: Daily/Weekly/Monthly/..." breakdown grouped by
+        # Plan, rather than re-deriving this client-side from raw scheme
+        # names. additionalOptions above is kept for backward
+        # compatibility with any existing JS that already reads it.
+        plans = [_plan_entry(row, is_current=True)] + [
+            _plan_entry(v, is_current=False) for v in group["variants"]
+        ]
+
         records.append({
             "name": str(row.get("Scheme Name", "")),
             "amc": str(row.get("AMC (Fund House)", "")) if not pd.isna(row.get("AMC (Fund House)")) else "",
@@ -201,6 +235,7 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
             "compositeScore": _num_or_none(row.get("Composite_Score")),
             "peerRank": int(peer_rank) if peer_rank is not None else None,
             "additionalOptions": additional_options,
+            "plans": plans,
         })
     return records
 
