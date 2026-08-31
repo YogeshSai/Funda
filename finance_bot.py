@@ -265,15 +265,36 @@ _OPTION_PHRASES = [
 # Backward-compatible alias.
 _OPTION_KEYWORDS = _OPTION_PHRASES
 
+# ----------------------------------------------------------------------
+# IDCW payout-frequency qualifiers -- "Daily IDCW", "Weekly IDCW",
+# "Monthly IDCW", "Quarterly IDCW", etc. are all still the SAME
+# underlying fund/portfolio as its Growth variant; only how often any
+# income distribution gets paid out differs. Previously only the bare
+# word "idcw"/"dividend" was stripped out of the dedup key, which left
+# "daily"/"weekly"/"monthly"/... sitting in the key -- so
+# "HSBC Banking and PSU Debt Fund - Direct Daily IDCW",
+# "... Direct Monthly IDCW" and "... Direct Weekly IDCW" each produced a
+# DIFFERENT key from each other AND from "... Direct Growth", and none of
+# them collapsed together. That's why the site kept showing 3-4 rows for
+# what is really one purchasable fund. Stripped out here, alongside the
+# option words above, so every frequency variant collapses onto the same
+# identity as its Growth sibling.
+_FREQUENCY_PHRASES = [
+    "half yearly", "half-yearly", "fortnightly", "quarterly",
+    "monthly", "weekly", "daily", "annual", "periodic",
+]
+
 
 def _fund_dedup_key(name: str) -> str:
     """Normalized identity for a fund, with the plan-option phrase (Growth /
     IDCW / Income Distribution cum Capital Withdrawal Option / Dividend /
-    ...) stripped out so different options of the same underlying fund
-    collapse to the same key. 'Direct'/'Regular Plan' is deliberately kept,
-    since those ARE genuinely different funds/TERs."""
+    ...) AND any IDCW payout-frequency qualifier (Daily/Weekly/Monthly/...)
+    stripped out, so different options -- and different payout frequencies
+    of the same option -- of the same underlying fund all collapse to the
+    same key. 'Direct'/'Regular Plan' is deliberately kept, since those ARE
+    genuinely different funds/TERs."""
     text = str(name).lower()
-    for phrase in _OPTION_PHRASES:
+    for phrase in _OPTION_PHRASES + _FREQUENCY_PHRASES:
         text = re.sub(re.escape(phrase), " ", text, flags=re.IGNORECASE)
     text = re.sub(r"[()]", " ", text)
     # Removing an option phrase leaves a stray separator (usually a "-")
@@ -334,9 +355,10 @@ def _is_direct_variant(name: str) -> bool:
 def _fund_identity_key(name: str) -> str:
     """Like _fund_dedup_key, but with the Direct/Regular plan phrase
     ALSO stripped out, so different plans of the same underlying fund
-    collapse to one identity. Used only by dedup_funds_keep_direct() --
-    dedup_funds() above still needs Direct/Regular kept apart for
-    callers that want both plans distinguished."""
+    collapse to one identity. Used by dedup_funds_keep_direct() and
+    group_funds_with_variants() -- dedup_funds() above still needs
+    Direct/Regular kept apart for callers that want both plans
+    distinguished."""
     text = _fund_dedup_key(name)
     for phrase in _PLAN_PHRASES:
         text = re.sub(r"\b" + re.escape(phrase) + r"\b", " ", text, flags=re.IGNORECASE)
@@ -362,6 +384,76 @@ def dedup_funds_keep_direct(df: pd.DataFrame) -> pd.DataFrame:
     )
     work = work.drop_duplicates(subset="_identity_key", keep="first")
     return work.drop(columns=["_identity_key", "_is_direct", "_is_growth"])
+
+
+# ----------------------------------------------------------------------
+# Grouping a fund with its other purchasable Plan/Option variants, for
+# display as "Additional investment options" underneath the single
+# primary (Direct + Growth, where available) listing -- rather than
+# dedup_funds_keep_direct()'s behaviour of silently dropping every
+# variant but the primary.
+# ----------------------------------------------------------------------
+_IDCW_HINT_RE = re.compile(
+    r"idcw|income distribution|dividend", re.IGNORECASE
+)
+_FREQUENCY_RE = re.compile(
+    r"\b(half[\s-]?yearly|fortnightly|quarterly|monthly|weekly|daily|annual|periodic)\b",
+    re.IGNORECASE,
+)
+
+
+def describe_variant_label(name: str) -> str:
+    """Short 'Plan - Option' label for a variant row, derived from its
+    Scheme Name (e.g. 'Direct Plan - Monthly IDCW', 'Regular Plan -
+    Growth'), for display under an "Additional investment options"
+    sub-heading."""
+    text = str(name)
+    lower = text.lower()
+    plan = "Direct Plan" if "direct" in lower else ("Regular Plan" if "regular" in lower else "")
+
+    if _IDCW_HINT_RE.search(lower):
+        freq_match = _FREQUENCY_RE.search(lower)
+        freq = freq_match.group(1).title() if freq_match else ""
+        option = (freq + " IDCW").strip()
+    elif "growth" in lower:
+        option = "Growth"
+    else:
+        option = "Other"
+
+    return f"{plan} - {option}" if plan else option
+
+
+def group_funds_with_variants(df: pd.DataFrame) -> list[dict]:
+    """Group rows by underlying fund identity (ignoring Plan and
+    Option/payout-frequency), choosing one primary row per group --
+    Direct plan preferred, then Growth option, matching
+    dedup_funds_keep_direct()'s own preference order -- and returning
+    every OTHER row in that group as a "variant" instead of silently
+    dropping it. Used by the site to show one primary fund card/profile
+    (Direct Growth wherever it exists) with any other purchasable
+    Plan/Option combinations (Regular plan, IDCW payout frequencies,
+    etc.) nested underneath as "Additional investment options".
+
+    Returns a list of {"primary": <pd.Series>, "variants": [<pd.Series>, ...]}
+    dicts, one per underlying fund.
+    """
+    if df.empty or "Scheme Name" not in df.columns:
+        return [{"primary": row, "variants": []} for _, row in df.iterrows()]
+
+    work = df.copy()
+    work["_identity_key"] = work["Scheme Name"].apply(_fund_identity_key)
+    work["_is_direct"] = work["Scheme Name"].apply(_is_direct_variant)
+    work["_is_growth"] = work["Scheme Name"].apply(_is_growth_variant)
+
+    groups = []
+    for _key, group in work.groupby("_identity_key", sort=False):
+        group = group.sort_values(
+            ["_is_direct", "_is_growth"], ascending=[False, False], kind="stable"
+        )
+        rows = [r.drop(labels=["_identity_key", "_is_direct", "_is_growth"]) for _, r in group.iterrows()]
+        primary, *variants = rows
+        groups.append({"primary": primary, "variants": variants})
+    return groups
 
 
 # ----------------------------------------------------------------------
@@ -498,6 +590,47 @@ def _category_core_tokens(label_l: str) -> set[str]:
     }
 
 
+# ----------------------------------------------------------------------
+# Near-duplicate category-label merging
+# ----------------------------------------------------------------------
+# Even after clean_subcat_label / subcat_browse_label strip the known
+# wrapper/prefix text, the sheet itself sometimes spells the SAME SEBI
+# category two different ways with no shared machine-detectable pattern
+# -- e.g. "Banking and PSU Fund" vs "Banking and PSU Debt Fund". Unlike
+# the ELSS case (_canonicalize_subcat), there's no fixed phrase to merge
+# on, so this is handled with a fuzzy pass over the cleaned labels
+# instead: any two labels within an Asset Type that are near-identical
+# (share nearly all their words) get folded into one directory entry,
+# keeping whichever raw value is backed by more funds as the canonical
+# one. Threshold is intentionally high (0.87) so it only catches
+# wording variants of the same category, not genuinely different but
+# similarly-worded categories (e.g. "Large Cap Fund" vs "Large & Mid Cap
+# Fund" scores well below this).
+_LABEL_MERGE_THRESHOLD = 0.87
+
+
+def _merge_similar_labels(by_label: dict[str, tuple[str, int]]) -> dict[str, tuple[str, int]]:
+    # Biggest group first, so a small mis-spelled variant folds into the
+    # dominant spelling rather than the other way around.
+    ordered = sorted(by_label.keys(), key=lambda l: -by_label[l][1])
+    merged: dict[str, tuple[str, int]] = {}
+    claimed: set[str] = set()
+    for label in ordered:
+        if label in claimed:
+            continue
+        raw, count = by_label[label]
+        for other in ordered:
+            if other == label or other in claimed:
+                continue
+            if fuzzy_ratio(label.lower(), other.lower()) >= _LABEL_MERGE_THRESHOLD:
+                other_raw, other_count = by_label[other]
+                if other_count > count:
+                    raw, count = other_raw, other_count
+                claimed.add(other)
+        claimed.add(label)
+        merged[label] = (raw, count)
+    return merged
+
 
 # ----------------------------------------------------------------------
 # Asset Type -> Sub Category mapping for the category directory.
@@ -513,7 +646,10 @@ def _category_core_tokens(label_l: str) -> set[str]:
 #      label appeared twice under one Asset Type. (A related case --
 #      ELSS vs. "ELSS Tax Saver" -- is handled earlier, upstream of this,
 #      by _canonicalize_subcat() in load_data(), since those two raw
-#      strings don't even clean down to the same text on their own.)
+#      strings don't even clean down to the same text on their own. A
+#      further case -- near-duplicate but not identical labels, e.g.
+#      "Banking and PSU Fund" vs "Banking and PSU Debt Fund" -- is
+#      handled by the fuzzy _merge_similar_labels() pass below.)
 #
 #   2. MISPLACEMENT: grouping by the sheet's "Asset Class" column trusts
 #      that column to be tagged correctly per row. In practice it isn't
@@ -553,30 +689,75 @@ def _infer_asset_type(raw_subcat: str) -> str | None:
 
 def _build_asset_type_subcat_map(
     df: pd.DataFrame, asset_types: list[str]
-) -> dict[str, list[str]]:
+) -> tuple[dict[str, list[str]], dict[str, str]]:
     """Build Asset Type -> [Sub Category, ...] for the category
     directory. Each cleaned display label is collapsed to a single
-    representative raw value per Asset Type (fixes duplicates), and each
-    Sub Category is bucketed by its own embedded scheme-type phrase
-    rather than the sheet's "Asset Class" column (fixes misplacement)."""
+    representative raw value per Asset Type (fixes exact duplicates),
+    near-duplicate labels are further folded together (fixes wording
+    variants like "Banking and PSU Fund" vs "Banking and PSU Debt
+    Fund"), and each Sub Category is bucketed by its own embedded
+    scheme-type phrase rather than the sheet's "Asset Class" column
+    (fixes misplacement).
+
+    Also returns raw_to_canonical: every distinct raw Sub Category value
+    that appears in the dataset, mapped to whichever raw value ended up
+    representing its (possibly merged) directory entry. Callers that
+    re-key a fund's own row onto the directory's canonical value (e.g.
+    app.py, so the site's client-side category grouping matches this
+    directory) need this FULL mapping -- not just the raws that ended up
+    in the final directory list -- otherwise a fund whose raw label was
+    the "losing" side of a near-duplicate merge silently keeps its own,
+    un-merged raw value instead of joining the merged category."""
     # asset_type -> {cleaned_label: (raw_value_with_max_count, fund_count)}
     buckets: dict[str, dict[str, tuple[str, int]]] = {a: {} for a in asset_types}
+    # asset_type -> {cleaned_label: [every raw value that cleans to this label]}
+    raws_by_label: dict[str, dict[str, list[str]]] = {a: {} for a in asset_types}
 
     counts = df.groupby(["Asset Class", "Sub Category"]).size()
     for (asset_class, raw_subcat), count in counts.items():
         asset_type = _infer_asset_type(raw_subcat) or asset_class
         by_label = buckets.setdefault(asset_type, {})
+        label_raws = raws_by_label.setdefault(asset_type, {})
         label = subcat_browse_label(raw_subcat)
+        label_raws.setdefault(label, []).append(raw_subcat)
         current = by_label.get(label)
         if current is None or count > current[1]:
             by_label[label] = (raw_subcat, count)
 
     result: dict[str, list[str]] = {}
+    raw_to_canonical: dict[str, str] = {}
     for asset_type, by_label in buckets.items():
-        raws = [raw for raw, _ in by_label.values()]
-        result[asset_type] = sorted(raws, key=subcat_browse_label)
+        merged = _merge_similar_labels(by_label)
+        raws = sorted({raw for raw, _ in merged.values()}, key=subcat_browse_label)
+        result[asset_type] = raws
 
-    return result
+        # merged only keeps the SURVIVING labels; walk every label that
+        # was folded into a survivor (including ones merged away by
+        # _merge_similar_labels, which aren't keys in `merged` at all)
+        # and point every raw value under every label at the survivor's
+        # canonical raw.
+        label_to_canonical_raw: dict[str, str] = {}
+        for surviving_label, (canon_raw, _count) in merged.items():
+            label_to_canonical_raw[surviving_label] = canon_raw
+        for label in by_label:
+            if label not in label_to_canonical_raw:
+                # This label was folded into some other (surviving) label
+                # by _merge_similar_labels -- find which one it maps to by
+                # re-running the same similarity check against survivors.
+                for surviving_label, canon_raw in list(label_to_canonical_raw.items()):
+                    if fuzzy_ratio(label.lower(), surviving_label.lower()) >= _LABEL_MERGE_THRESHOLD:
+                        label_to_canonical_raw[label] = canon_raw
+                        break
+                else:
+                    # Shouldn't happen, but fall back to its own raw
+                    # rather than dropping the fund from the map.
+                    label_to_canonical_raw[label] = by_label[label][0]
+        for label, raw_list in raws_by_label[asset_type].items():
+            canon_raw = label_to_canonical_raw.get(label, by_label[label][0])
+            for raw in raw_list:
+                raw_to_canonical[raw] = canon_raw
+
+    return result, raw_to_canonical
 
 
 def _fund_link(name: str) -> str:
@@ -718,11 +899,14 @@ class FinanceBot:
         # category directory.
         if "Asset Class" in df.columns:
             self._asset_types = sorted(df["Asset Class"].dropna().unique().tolist())
-            self._asset_type_to_subcats = _build_asset_type_subcat_map(df, self._asset_types)
+            self._asset_type_to_subcats, self._subcat_canonical_map = _build_asset_type_subcat_map(
+                df, self._asset_types
+            )
         else:
             # No Asset Class column -> treat everything as one bucket.
             self._asset_types = ["All Funds"]
             self._asset_type_to_subcats = {"All Funds": self._sub_categories}
+            self._subcat_canonical_map = {sc: sc for sc in self._sub_categories}
 
         # Local NLP: AMC / fund-house matcher, built from the dataset's own
         # "AMC (Fund House)" column values -- never a hardcoded list -- so
@@ -752,6 +936,18 @@ class FinanceBot:
     @property
     def asset_type_to_subcats(self) -> dict[str, list[str]]:
         return self._asset_type_to_subcats
+
+    @property
+    def subcat_canonical_map(self) -> dict[str, str]:
+        """Every raw Sub Category value seen in the dataset, mapped to
+        the raw value that represents its (possibly near-duplicate-
+        merged) entry in asset_type_to_subcats. Use this to re-key a
+        fund's own raw Sub Category before grouping/filtering by
+        category, so funds whose raw label was the "losing" side of a
+        merge (e.g. "Banking and PSU Debt Fund" folded into "Banking and
+        PSU Fund") still land in the merged category instead of a
+        leftover, no-longer-listed one."""
+        return self._subcat_canonical_map
 
     def fund_count(self) -> int:
         return len(self.df)
@@ -1209,7 +1405,7 @@ class FinanceBot:
     # ------------------------------------------------------------------
     # Formatting: full fund profile -> markdown
     # ------------------------------------------------------------------
-    def format_fund_profile(self, row: pd.Series, fund_summarizer=None) -> str:
+    def format_fund_profile(self, row: pd.Series, fund_summarizer=None, variants: list[pd.Series] | None = None) -> str:
         def fmt(v, is_percent=False):
             if pd.isna(v):
                 return "—"
@@ -1322,6 +1518,24 @@ class FinanceBot:
             if not pd.isna(peer_rank):
                 bits.append(f"**Peer Rank:** #{int(peer_rank)}")
             out.append(" · ".join(bits))
+
+        # Additional investment options -- other purchasable Plan/Option
+        # combinations of this SAME underlying fund (Regular plan, IDCW
+        # payout frequencies, etc.) that were folded out of the primary
+        # listing above by group_funds_with_variants(). Shown as a plain
+        # sub-heading + list rather than duplicate top-level fund cards,
+        # so the site shows one fund per underlying portfolio while still
+        # surfacing every way it can actually be bought.
+        if variants:
+            out.append("")
+            out.append("**Additional investment options**")
+            out.append('<div class="ff-hint">Same underlying fund, different Plan/Option.</div>')
+            out.append("")
+            for variant in variants:
+                v_label = describe_variant_label(variant["Scheme Name"])
+                v_nav = variant.get("Latest NAV")
+                nav_bit = f" — NAV {fmt(v_nav)}" if not pd.isna(v_nav) else ""
+                out.append(f"- **{v_label}**{nav_bit}")
 
         # AI Verdict is always rendered as a standard section on every
         # fund's profile -- not just when a summarizer happens to be
