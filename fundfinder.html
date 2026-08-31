@@ -48,7 +48,11 @@
   }
 
   /* ---------- shell ---------- */
-  .wrap{ max-width:880px; margin:0 auto; padding:0 20px 64px; }
+  /* Bottom padding trimmed (was 64px) -- this, plus the footer/hero
+     spacing trims below and the auto-resize script at the bottom of
+     this file, removes the large empty band that used to sit under
+     the footer inside the fixed-height Streamlit iframe. */
+  .wrap{ max-width:880px; margin:0 auto; padding:0 20px 28px; }
 
   header.topbar{
     display:flex; align-items:center; gap:12px;
@@ -70,12 +74,25 @@
   }
   .pill.on{ color:var(--ikat-teal); border-color:var(--ikat-teal); }
 
+  /* ---------- primary navigation ---------- */
+  .mainnav{
+    max-width:880px; margin:0 auto; padding:0 20px 10px;
+    display:flex; gap:8px; flex-wrap:wrap;
+  }
+  .nav-btn{
+    font-family:inherit; font-size:0.86rem; font-weight:700;
+    padding:8px 16px; border-radius:999px; cursor:pointer;
+    border:1.5px solid var(--gold-line); background:var(--paper); color:var(--ink-soft);
+  }
+  .nav-btn:hover{ border-color:var(--kumkum); color:var(--kumkum); }
+  .nav-btn.active{ background:var(--ink); border-color:var(--ink); color:#fff; }
+
   /* ---------- hero ---------- */
-  .hero{ position:relative; padding:34px 0 8px; overflow:visible; }
+  .hero{ position:relative; padding:22px 0 8px; overflow:visible; }
   .headline{ font-size:2.05rem; font-weight:700; margin:0 0 6px; line-height:1.25; }
   .headline .accent{ color:var(--kumkum); }
   .hero-sub{ color:var(--ink-soft); font-size:1rem; margin:0 0 22px; max-width:560px; }
-  .flower{ position:absolute; right:-6px; top:6px; width:96px; height:96px; opacity:0.9; }
+  .flower{ position:absolute; right:-6px; top:0px; width:96px; height:96px; opacity:0.9; }
 
   @media (max-width:640px){
     .headline{ font-size:1.55rem; }
@@ -109,12 +126,6 @@
     box-shadow:0 10px 28px rgba(42,29,20,0.16);
     max-height:360px; overflow-y:auto;
   }
-  /* Suggestion rows: was a single nowrap/ellipsis line, which clipped
-     long fund names on narrow (mobile) screens so the user could never
-     see the full suggestion text. Now wraps: tag + label share the top
-     line and wrap onto more lines as needed, and the AMC/asset-type
-     meta text always drops to its own full-width line underneath
-     rather than getting squeezed or cut off next to the label. */
   .suggest-item{
     display:flex; align-items:flex-start; gap:6px 10px; width:100%;
     flex-wrap:wrap;
@@ -144,9 +155,23 @@
   }
   .suggest-empty{ padding:16px; font-size:0.9rem; color:var(--ink-soft); }
 
+  /* ---------- quick categories on Home ---------- */
+  .quick-row{ display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 4px; }
+  .quick-chip{
+    font-family:inherit; font-size:0.84rem; font-weight:600;
+    background:var(--paper); border:1.5px solid var(--gold-line); border-radius:999px;
+    padding:7px 14px; cursor:pointer; color:var(--ink);
+  }
+  .quick-chip:hover{ border-color:var(--kumkum); color:var(--kumkum); }
+  .browse-all-link{
+    display:inline-block; margin-top:14px; font-weight:700; font-size:0.9rem;
+    background:none; border:none; color:var(--ikat-teal); cursor:pointer; font-family:inherit; padding:0;
+  }
+  .browse-all-link:hover{ text-decoration:underline; }
+
   /* ---------- back link ---------- */
   .back-link{
-    display:inline-flex; align-items:center; gap:6px; margin:22px 0 4px;
+    display:inline-flex; align-items:center; gap:6px; margin:18px 0 4px;
     background:none; border:none; cursor:pointer; color:var(--ikat-teal);
     font-weight:700; font-size:0.9rem; font-family:inherit; padding:4px 0;
   }
@@ -155,9 +180,20 @@
   /* ---------- category directory ---------- */
   .section-label{
     font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em;
-    color:var(--ink-soft); font-weight:700; margin:34px 0 12px;
+    color:var(--ink-soft); font-weight:700; margin:22px 0 12px;
   }
-  .asset-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .page-title{ font-size:1.5rem; font-weight:700; margin:18px 0 4px; }
+  .page-sub{ color:var(--ink-soft); font-size:0.92rem; margin:0 0 18px; }
+
+  /* align-items:start is the actual fix for the reported desktop bug:
+     by default a CSS grid stretches every item in a row to match the
+     tallest item in that row. Two <details class="asset-card"> sitting
+     side by side are in the same row, so opening the LEFT accordion
+     (making it taller) was forcing the grid to stretch the CLOSED
+     accordion on the right to match that height too -- leaving a big
+     blank gap under its collapsed content. Setting align-items:start
+     makes each card size to its own content only. */
+  .asset-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
   @media (max-width:640px){ .asset-grid{ grid-template-columns:1fr; } }
 
   details.asset-card{
@@ -214,7 +250,7 @@
   .metric-value.neg{ color:var(--down); }
 
   /* ---------- fund profile ---------- */
-  .profile-title{ font-size:1.5rem; font-weight:700; margin:22px 0 4px; }
+  .profile-title{ font-size:1.5rem; font-weight:700; margin:18px 0 4px; }
   .profile-sub{ color:var(--ink-soft); font-size:0.92rem; margin-bottom:16px; }
   .basic-list{ list-style:none; margin:0 0 20px; padding:0; display:flex; flex-direction:column; gap:5px; }
   .basic-list li{ font-size:0.92rem; }
@@ -281,8 +317,75 @@
   .verdict-body{ font-size:0.92rem; line-height:1.55; margin:0 0 10px; }
   .verdict-disclaimer{ font-size:0.78rem; color:var(--ink-soft); font-style:italic; margin:0; }
 
+  /* ---------- FAQ page ---------- */
+  .faq-list{ display:flex; flex-direction:column; gap:10px; margin-bottom:8px; }
+  details.faq-item{
+    background:var(--paper); border:1.5px solid var(--ink); border-radius:12px; overflow:hidden;
+  }
+  details.faq-item summary{
+    list-style:none; cursor:pointer; padding:13px 16px; font-weight:700; font-size:0.94rem;
+    display:flex; align-items:center; gap:10px;
+  }
+  details.faq-item summary::-webkit-details-marker{ display:none; }
+  details.faq-item summary:hover{ background:#FBF0DC; }
+  details.faq-item summary::after{
+    content:""; margin-left:auto; flex:none; width:8px; height:8px;
+    border-right:2px solid var(--ink-soft); border-bottom:2px solid var(--ink-soft);
+    transform:rotate(45deg); transition:transform .15s ease;
+  }
+  details.faq-item[open] summary::after{ transform:rotate(-135deg); }
+  .faq-body{ padding:0 16px 14px; font-size:0.9rem; line-height:1.6; color:var(--ink); }
+
+  /* ---------- floating FinBot chatbot ---------- */
+  .finbot-fab{
+    position:fixed; right:20px; bottom:20px; z-index:200;
+    width:56px; height:56px; border-radius:50%;
+    background:var(--kumkum); border:3px solid var(--marigold);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; box-shadow:0 6px 18px rgba(42,29,20,0.28);
+  }
+  .finbot-fab:hover{ transform:translateY(-2px); }
+  .finbot-panel{
+    position:fixed; right:20px; bottom:86px; z-index:200;
+    width:min(340px, calc(100vw - 40px)); max-height:min(500px, calc(100vh - 140px));
+    background:var(--paper); border:1.5px solid var(--ink); border-radius:16px;
+    box-shadow:0 14px 34px rgba(42,29,20,0.24);
+    display:none; flex-direction:column; overflow:hidden;
+  }
+  .finbot-panel.open{ display:flex; }
+  .finbot-head{
+    background:var(--kumkum); color:#fff; padding:12px 14px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .finbot-head b{ font-size:0.94rem; }
+  .finbot-head span{ font-size:0.72rem; opacity:0.85; display:block; }
+  .finbot-close{
+    margin-left:auto; background:none; border:none; color:#fff; cursor:pointer; font-size:1rem;
+  }
+  .finbot-body{ flex:1; overflow-y:auto; padding:12px 12px 4px; display:flex; flex-direction:column; gap:8px; }
+  .finbot-msg{ max-width:88%; font-size:0.85rem; line-height:1.5; padding:9px 12px; border-radius:12px; }
+  .finbot-msg.bot{ background:var(--cream); border:1px solid var(--gold-line); align-self:flex-start; }
+  .finbot-msg.user{ background:var(--ikat-teal); color:#fff; align-self:flex-end; }
+  .finbot-chip-row{ display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
+  .finbot-chip{
+    font-family:inherit; font-size:0.74rem; font-weight:600; background:var(--paper);
+    border:1px solid var(--gold-line); border-radius:999px; padding:4px 10px; cursor:pointer;
+  }
+  .finbot-chip:hover{ border-color:var(--kumkum); color:var(--kumkum); }
+  .finbot-quickrow{ padding:6px 12px 0; display:flex; flex-wrap:wrap; gap:6px; }
+  .finbot-inputrow{ display:flex; gap:8px; padding:10px 12px 12px; border-top:1px solid #F0E6D6; }
+  .finbot-inputrow input{
+    flex:1; font-family:inherit; font-size:0.86rem; padding:9px 12px;
+    border:1.5px solid var(--ink); border-radius:999px; outline:none;
+  }
+  .finbot-inputrow button{
+    background:var(--kumkum); color:#fff; border:none; border-radius:999px;
+    padding:0 16px; font-family:inherit; font-weight:700; cursor:pointer;
+  }
+  .finbot-disclaimer{ font-size:0.68rem; color:var(--ink-soft); padding:0 12px 8px; }
+
   /* ---------- footer ---------- */
-  footer{ margin-top:48px; padding-top:20px; border-top:1.5px solid var(--gold-line); }
+  footer{ margin-top:26px; padding-top:16px; border-top:1.5px solid var(--gold-line); }
   footer p{ font-size:0.8rem; color:var(--ink-soft); line-height:1.6; }
   footer .footer-telugu{ margin-top:6px; }
 
@@ -310,31 +413,14 @@
     <span class="pill">Made in Telangana</span>
   </div>
 </header>
+<nav class="mainnav" id="mainNav">
+  <button class="nav-btn" data-nav="home">Home</button>
+  <button class="nav-btn" data-nav="browse">Browse by Category</button>
+  <button class="nav-btn" data-nav="faq">FAQ</button>
+</nav>
 <div class="ikat-strip"></div>
 
 <div class="wrap">
-
-  <section class="hero">
-    <svg class="flower" viewBox="0 0 100 100" aria-hidden="true">
-      <circle cx="50" cy="50" r="10" fill="#93610E"/>
-      <g fill="none" stroke-width="9" stroke-linecap="round">
-        <circle cx="50" cy="50" r="24" stroke="#F0A93B" stroke-dasharray="8 6"/>
-        <circle cx="50" cy="50" r="36" stroke="#C1272D" stroke-dasharray="7 7"/>
-        <circle cx="50" cy="50" r="47" stroke="#0F6E6E" stroke-dasharray="6 9"/>
-      </g>
-    </svg>
-    <h1 class="headline">Search a fund like you'd <span class="accent telugu">బతుకమ్మ</span> gaddi —<br>pick, compare, decide.</h1>
-    <p class="hero-sub">Type a fund name, an AMC, or a category — Large Cap, ELSS, Flexi Cap, whatever. No sign-up, no jargon overload, just the numbers a first-jobber in Hyderabad or a final-year student in Warangal actually needs before putting money in.</p>
-
-    <div class="search-shell">
-      <div class="search-box">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6E5B4E" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6"/></svg>
-        <input id="searchInput" type="text" placeholder="Try 'HDFC Flexi Cap', 'ELSS', or 'Small Cap Fund'" autocomplete="off">
-        <button class="clear-btn" id="clearBtn" aria-label="Clear search">✕</button>
-      </div>
-      <div class="suggest" id="suggestBox" hidden></div>
-    </div>
-  </section>
 
   <div id="backSlot"></div>
   <main id="mainArea"></main>
@@ -343,6 +429,29 @@
     <p><b>Disclaimer:</b> Fund data on this site comes from the MF_Risk_Metrics dataset and reflects NAV history as of that dataset's last update — it is not a live market feed. Rankings, Composite Scores, and the "AI Verdict" are computed from that historical data for informational and educational purposes only and are not financial, investment, tax, or legal advice. Past performance never guarantees future returns — please do your own homework and talk to a registered financial advisor before investing.</p>
     <p class="footer-telugu telugu">నీ డబ్బులు, నీ నిర్ణయం — ఇది కేవలం ఒక సాధనం, సలహా కాదు.</p>
   </footer>
+</div>
+
+<!-- ---------- Floating FinBot chatbot ---------- -->
+<button class="finbot-fab" id="finbotFab" aria-label="Open FinBot chat">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+  </svg>
+</button>
+<div class="finbot-panel" id="finbotPanel">
+  <div class="finbot-head">
+    <div>
+      <b>FinBot</b>
+      <span>Fund &amp; finance FAQ helper</span>
+    </div>
+    <button class="finbot-close" id="finbotClose" aria-label="Close chat">✕</button>
+  </div>
+  <div class="finbot-body" id="finbotBody"></div>
+  <div class="finbot-quickrow" id="finbotQuickRow"></div>
+  <div class="finbot-inputrow">
+    <input id="finbotInput" type="text" placeholder="Ask e.g. 'What is Sharpe Ratio?'" autocomplete="off">
+    <button id="finbotSend">Send</button>
+  </div>
+  <div class="finbot-disclaimer">Rule-based helper answering from this site's own FAQ + fund data — not a live AI model, and not personalised financial advice.</div>
 </div>
 
 <script>
@@ -366,7 +475,7 @@ const FUNDS = /*__FUND_DATA_JSON__*/[]/*__END_FUND_DATA_JSON__*/;
 
 /* Precomputed once (not per keystroke): the distinct sub-categories the
    loaded data actually contains, with their display label and asset
-   type — used by both the home directory and the search suggestions. */
+   type — used by both the category directory and the search suggestions. */
 const CATEGORIES = (() => {
   const seen = new Map();
   FUNDS.forEach(f => {
@@ -397,10 +506,16 @@ function labelFor(subCategoryRaw){
   return c ? c.label : subCategoryRaw;
 }
 
+function fundCountFor(subCategoryRaw){
+  return FUNDS.reduce((n,f)=> n + (f.subCategoryRaw===subCategoryRaw ? 1 : 0), 0);
+}
+
 /* ---------------------------------------------------------------------
    Simple offline fuzzy scoring: word-overlap + substring boost. Good
    enough for a demo search box, mirrors the intent of the original
    token_set_ratio approach without needing a fuzzy-matching library.
+   Also reused by FinBot (below) to match a typed question against the
+   FAQ knowledge base.
    --------------------------------------------------------------------- */
 function norm(s){ return s.toLowerCase().replace(/funds?\b/g,"fund").replace(/\s+/g," ").trim(); }
 
@@ -432,13 +547,109 @@ function searchSuggestions(query, limit=8){
 }
 
 /* ---------------------------------------------------------------------
+   FAQ knowledge base — shared by the FAQ page (rendered as an
+   accordion) and FinBot (matched against a typed question). Keeping
+   one shared list means the chatbot's answers are always consistent
+   with what the FAQ page itself says.
+   --------------------------------------------------------------------- */
+const FAQ_ITEMS = [
+  { q:"What is NAV (Net Asset Value)?", keywords:["nav","net asset value","unit price"],
+    a:"NAV is the per-unit price of a mutual fund on a given day — (Total value of the fund's holdings − liabilities) ÷ number of units outstanding. It moves daily as the market value of the fund's underlying investments changes." },
+  { q:"What is Absolute Return?", keywords:["absolute return"],
+    a:"Absolute Return is the plain percentage change in value over a period, with no adjustment for how long that period was: (End Value − Start Value) ÷ Start Value × 100. A 40% absolute return over 3 years is very different from 40% over 1 year — for that, CAGR is the fairer measure." },
+  { q:"What is CAGR (Compound Annual Growth Rate)?", keywords:["cagr","annualised return","annualized return","compound annual growth"],
+    a:"CAGR converts a multi-year return into a single 'per year, compounding' figure so different holding periods can be compared fairly: CAGR = (End Value ÷ Start Value)^(1 ÷ Number of Years) − 1. A fund's 3Y CAGR of 15% means it grew as if compounding at 15% every year for 3 years." },
+  { q:"What is Volatility (Standard Deviation)?", keywords:["volatility","standard deviation","std dev","risk"],
+    a:"Volatility is how much a fund's returns swing up and down over time — the standard deviation of its periodic returns. Higher volatility means a bumpier ride (bigger gains and bigger falls); lower volatility means steadier performance." },
+  { q:"What is Max Drawdown?", keywords:["max drawdown","maximum drawdown","mdd","biggest loss"],
+    a:"Max Drawdown is the single worst peak-to-trough fall the fund has seen in the measured period — roughly, if you'd invested at the fund's highest point and sold at its lowest point afterwards, this is about how much you'd have lost before it recovered. Less negative is better." },
+  { q:"What is the Sharpe Ratio?", keywords:["sharpe","sharpe ratio"],
+    a:"Sharpe Ratio = (Fund's Return − Risk-free Rate) ÷ Volatility (Std. Dev.). It shows how much extra return you earned per unit of total risk taken. Higher is better." },
+  { q:"What is the Sortino Ratio?", keywords:["sortino","sortino ratio"],
+    a:"Sortino Ratio is like the Sharpe Ratio, but it only penalises downside volatility (bad swings), not the upside: Sortino = (Return − Risk-free Rate) ÷ Downside Deviation. Many consider it a fairer risk-adjusted measure, since investors don't mind upside 'volatility'." },
+  { q:"What is the Calmar Ratio?", keywords:["calmar","calmar ratio"],
+    a:"Calmar Ratio = Annualised Return ÷ Max Drawdown (in absolute terms). It measures return relative to the worst loss an investor would have had to sit through — higher is better." },
+  { q:"What is Value at Risk (VaR 95%)?", keywords:["var","value at risk"],
+    a:"VaR at 95% confidence estimates the worst loss you'd expect over a given period, 95% of the time — put another way, there's roughly a 1-in-20 chance the actual loss could be worse than this figure." },
+  { q:"What is Downside Deviation?", keywords:["downside deviation"],
+    a:"Downside Deviation is like Volatility, but it only counts periods where returns fell below a target (usually zero) — isolating the 'bad' variability rather than penalising strong up-months too." },
+  { q:"What is the Composite Score and Peer Rank?", keywords:["composite score","peer rank","peer percentile","ranking","how are funds ranked"],
+    a:"Composite Score blends a fund's 3-year return, risk-adjusted return (Sharpe/Sortino/Calmar), drawdown, and volatility — each compared against its category peers — into one score used to rank funds. Peer Rank / Peer Percentile show where the fund stands versus category peers on that blended measure." },
+  { q:"What does ELSS mean?", keywords:["elss","tax saver","tax saving fund","80c"],
+    a:"ELSS (Equity Linked Savings Scheme) is an equity mutual fund category that qualifies for tax deduction under Section 80C, with a mandatory 3-year lock-in — the shortest lock-in among 80C options." },
+  { q:"Direct Plan vs Regular Plan — what's the difference?", keywords:["direct plan","regular plan","direct vs regular"],
+    a:"A Direct Plan is bought straight from the AMC with no distributor commission, so it has a lower expense ratio and (all else equal) a slightly higher return over time than the same fund's Regular Plan, bought through an intermediary earning a trail commission." },
+  { q:"Growth vs IDCW (Dividend) option — what's the difference?", keywords:["growth option","idcw","dividend option","income distribution"],
+    a:"Growth reinvests all gains back into the fund, so NAV compounds with no payouts. IDCW (Income Distribution cum Capital Withdrawal, the modern name for 'Dividend') periodically pays out some gains in cash, reducing NAV after each payout." },
+  { q:"What's the difference between Equity, Debt, and Hybrid funds?", keywords:["equity fund","debt fund","hybrid fund","asset type","asset class"],
+    a:"Equity funds invest mainly in stocks (higher risk, higher long-term growth potential). Debt funds invest mainly in bonds/fixed-income (generally lower risk, steadier returns). Hybrid funds mix both to balance growth and stability." },
+  { q:"How should I pick a mutual fund?", keywords:["how to choose","how to pick","which fund should i","best fund for me"],
+    a:"There's no single 'best' fund for everyone — it depends on your goal, horizon, and risk appetite. Match the Asset Type/Category to your horizon (equity for 5+ years, debt for shorter goals), then compare funds within that category on Composite Score, Sharpe/Sortino Ratio, and Max Drawdown together — not returns alone. This site is an information tool, not personalised advice." },
+  { q:"Is the AI Verdict / this chatbot financial advice?", keywords:["financial advice","is this advice","ai verdict","reliable","trust"],
+    a:"No. The AI Verdict on each fund page and FinBot are both automated, rule-based reads of historical numbers in this site's own dataset — not personalised financial advice. Please consider your own goals and consult a registered financial advisor before investing." },
+  { q:"How current is the fund data on this site?", keywords:["data updated","how current","live data","real time","up to date"],
+    a:"The fund data reflects the NAV history in this site's dataset as of its last update — it is not a live market feed, so figures may lag the latest NAV. Always check the fund's official factsheet before investing." },
+];
+
+/* =====================================================================
+   View router — Home / Browse by Category / FAQ / Category / Fund.
+   A small stack (rather than a single "current view" flag) is kept so
+   the Back button on a Category or Fund page returns to wherever the
+   user actually came from (Browse, a search result, or another
+   category), while the three main nav buttons always reset straight
+   to a fresh Home / Browse / FAQ.
+   ===================================================================== */
+let viewStack = [{ view: "home", params: {} }];
+
+function currentEntry(){ return viewStack[viewStack.length-1]; }
+
+function goTo(view, params={}){
+  viewStack.push({ view, params });
+  render();
+}
+function resetTo(view, params={}){
+  viewStack = [{ view, params }];
+  render();
+}
+function replaceTop(view, params={}){
+  viewStack[viewStack.length-1] = { view, params };
+  render();
+}
+function goBack(){
+  if(viewStack.length>1){ viewStack.pop(); render(); }
+}
+
+function updateNavActive(view){
+  document.querySelectorAll(".nav-btn").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.nav === view);
+  });
+}
+
+function render(){
+  const entry = currentEntry();
+  updateNavActive(["home","browse","faq"].includes(entry.view) ? entry.view : "");
+  if(entry.view === "home"){ renderBack(false); renderHome(); }
+  else if(entry.view === "browse"){ renderBack(false); renderBrowse(); }
+  else if(entry.view === "faq"){ renderBack(false); renderFAQ(); }
+  else if(entry.view === "category"){ renderBack(true); renderCategoryView(entry.params.subCategory, !!entry.params.showAll); }
+  else if(entry.view === "fund"){ renderBack(true); renderFundView(entry.params.name); }
+  window.scrollTo({ top:0, behavior:"instant" });
+  scheduleHeightReport();
+}
+
+document.getElementById("mainNav").addEventListener("click", e=>{
+  const btn = e.target.closest(".nav-btn");
+  if(!btn) return;
+  const nav = btn.dataset.nav;
+  closeSuggestions();
+  resetTo(nav);
+});
+
+/* ---------------------------------------------------------------------
    Rendering
    --------------------------------------------------------------------- */
 const mainArea = document.getElementById("mainArea");
 const backSlot = document.getElementById("backSlot");
-const searchInput = document.getElementById("searchInput");
-const suggestBox = document.getElementById("suggestBox");
-const clearBtn = document.getElementById("clearBtn");
 
 document.getElementById("fundCountPill").textContent = FUNDS.length.toLocaleString("en-IN") + " funds tracked";
 
@@ -454,21 +665,66 @@ function signClass(v){ return (v!==null && v!==undefined && v>0)?"pos":((v!==nul
 
 function renderBack(show){
   backSlot.innerHTML = show
-    ? `<button class="back-link" id="backBtn">&larr; Back to search</button>`
+    ? `<button class="back-link" id="backBtn">&larr; Back</button>`
     : "";
-  if(show) document.getElementById("backBtn").onclick = goHome;
+  if(show) document.getElementById("backBtn").onclick = goBack;
 }
 
-function goHome(){
-  searchInput.value = "";
-  closeSuggestions();
-  renderBack(false);
-  renderHome();
-}
-
+/* ---- Home: hero + search + a handful of quick-pick categories ---- */
 function renderHome(){
+  const quick = CATEGORIES
+    .map(c=>({...c, count:fundCountFor(c.raw)}))
+    .sort((a,b)=>b.count-a.count)
+    .slice(0,6);
+
+  let html = `
+    <section class="hero">
+      <svg class="flower" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="10" fill="#93610E"/>
+        <g fill="none" stroke-width="9" stroke-linecap="round">
+          <circle cx="50" cy="50" r="24" stroke="#F0A93B" stroke-dasharray="8 6"/>
+          <circle cx="50" cy="50" r="36" stroke="#C1272D" stroke-dasharray="7 7"/>
+          <circle cx="50" cy="50" r="47" stroke="#0F6E6E" stroke-dasharray="6 9"/>
+        </g>
+      </svg>
+      <h1 class="headline">Search a fund like you'd <span class="accent telugu">బతుకమ్మ</span> gaddi —<br>pick, compare, decide.</h1>
+      <p class="hero-sub">Type a fund name, an AMC, or a category — Large Cap, ELSS, Flexi Cap, whatever. No sign-up, no jargon overload, just the numbers a first-jobber in Hyderabad or a final-year student in Warangal actually needs before putting money in.</p>
+
+      <div class="search-shell">
+        <div class="search-box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6E5B4E" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6"/></svg>
+          <input id="searchInput" type="text" placeholder="Try 'HDFC Flexi Cap', 'ELSS', or 'Small Cap Fund'" autocomplete="off">
+          <button class="clear-btn" id="clearBtn" aria-label="Clear search">✕</button>
+        </div>
+        <div class="suggest" id="suggestBox" hidden></div>
+      </div>
+
+      <div class="quick-row">
+        ${quick.map(c=>`<button class="quick-chip" data-cat="${esc(c.raw)}">${esc(c.label)}</button>`).join("")}
+      </div>
+      <button class="browse-all-link" id="browseAllLink">Browse all categories &rarr;</button>
+    </section>`;
+
+  mainArea.innerHTML = html;
+
+  const searchInput = document.getElementById("searchInput");
+  const suggestBox = document.getElementById("suggestBox");
+  const clearBtn = document.getElementById("clearBtn");
+  wireSearchBox(searchInput, suggestBox, clearBtn);
+
+  mainArea.querySelectorAll(".quick-chip").forEach(btn=>{
+    btn.onclick = ()=> goTo("category", { subCategory: btn.dataset.cat });
+  });
+  document.getElementById("browseAllLink").onclick = ()=> resetTo("browse");
+}
+
+/* ---- Browse by Category: the full Asset Type -> Sub Category directory ---- */
+function renderBrowse(){
   const dirs = buildDirectory();
-  let html = `<div class="section-label">Browse by category</div><div class="asset-grid">`;
+  let html = `
+    <h2 class="page-title">Browse by Category</h2>
+    <p class="page-sub">Pick an Asset Type to see its Sub Categories, then tap one to see every mutual fund we track in it.</p>
+    <div class="asset-grid">`;
   dirs.forEach(d=>{
     html += `<details class="asset-card"><summary>${esc(d.assetType)}<span class="count">${d.subs.length} categories</span></summary>
       <div class="subcat-list">`;
@@ -480,11 +736,27 @@ function renderHome(){
   html += `</div>`;
   mainArea.innerHTML = html;
   mainArea.querySelectorAll(".subcat-btn").forEach(btn=>{
-    btn.onclick = ()=>openCategory(btn.dataset.cat);
+    btn.onclick = ()=> goTo("category", { subCategory: btn.dataset.cat });
   });
 }
 
-/* Top-N funds shown per category. Was 2 -- bumped to 5 per request. */
+/* ---- FAQ page ---- */
+function renderFAQ(){
+  let html = `
+    <h2 class="page-title">FAQ &amp; Terminology</h2>
+    <p class="page-sub">What the numbers on this site mean, and roughly how they're calculated.</p>
+    <div class="faq-list">`;
+  FAQ_ITEMS.forEach((item,i)=>{
+    html += `<details class="faq-item" ${i===0?"open":""}>
+      <summary>${esc(item.q)}</summary>
+      <div class="faq-body">${esc(item.a)}</div>
+    </details>`;
+  });
+  html += `</div>`;
+  mainArea.innerHTML = html;
+}
+
+/* Top-N funds shown per category. */
 const TOP_N = 5;
 
 /* Collapse a sorted fund list down to at most one fund per AMC, keeping
@@ -508,8 +780,8 @@ function dedupeByAmc(sortedFunds){
   return out;
 }
 
-function openCategory(subCategory, showAll){
-  renderBack(true);
+/* ---- Category view: top (or all) funds in a Sub Category ---- */
+function renderCategoryView(subCategory, showAll){
   const label = labelFor(subCategory);
   const allSorted = FUNDS.filter(f=>f.subCategoryRaw===subCategory)
                     .slice()
@@ -523,6 +795,10 @@ function openCategory(subCategory, showAll){
 
   let html = `<h2 class="cat-heading">${heading} <span class="cat-name">${esc(label)}</span></h2>
     <p class="cat-note">${note}</p>`;
+
+  if(subset.length === 0){
+    html += `<p class="empty-note">No funds found in this category.</p>`;
+  }
 
   subset.forEach((f,i)=>{
     const horizons = [["1D","1D"],["6M","6M"],["1Y","1Y"],["3Y","3Y"],["5Y","5Y"]];
@@ -546,18 +822,18 @@ function openCategory(subCategory, showAll){
 
   if(!showAll && allSorted.length > subset.length){
     html += `<button class="view-all-btn" id="viewAllBtn">View all ${allSorted.length} funds in ${esc(label)}</button>`;
-  } else if(showAll){
+  } else if(showAll && allSorted.length){
     html += `<button class="view-all-btn" id="viewTopBtn">Show top performers only</button>`;
   }
 
   mainArea.innerHTML = html;
   mainArea.querySelectorAll(".fund-name-btn").forEach(btn=>{
-    btn.onclick = ()=>openFund(btn.dataset.fund);
+    btn.onclick = ()=> goTo("fund", { name: btn.dataset.fund });
   });
   const viewAllBtn = document.getElementById("viewAllBtn");
-  if(viewAllBtn) viewAllBtn.onclick = ()=>openCategory(subCategory, true);
+  if(viewAllBtn) viewAllBtn.onclick = ()=> replaceTop("category", { subCategory, showAll:true });
   const viewTopBtn = document.getElementById("viewTopBtn");
-  if(viewTopBtn) viewTopBtn.onclick = ()=>openCategory(subCategory, false);
+  if(viewTopBtn) viewTopBtn.onclick = ()=> replaceTop("category", { subCategory, showAll:false });
 }
 
 function buildVerdict(f){
@@ -628,8 +904,8 @@ function renderPlans(f){
   return html;
 }
 
-function openFund(name){
-  renderBack(true);
+/* ---- Fund profile view ---- */
+function renderFundView(name){
   const f = FUNDS.find(x=>x.name===name);
   if(!f){ mainArea.innerHTML = `<p class="empty-note">Couldn't find "${esc(name)}" in the dataset.</p>`; return; }
 
@@ -684,49 +960,192 @@ function openFund(name){
 }
 
 /* ---------------------------------------------------------------------
-   Search box + live suggestions
+   Search box + live suggestions — wired fresh each time Home renders,
+   since mainArea.innerHTML is fully replaced on every view change.
    --------------------------------------------------------------------- */
-function closeSuggestions(){
-  suggestBox.hidden = true;
-  suggestBox.innerHTML = "";
-  clearBtn.classList.remove("show");
-}
-
-function renderSuggestions(query){
-  if(!query.trim()){ closeSuggestions(); return; }
-  clearBtn.classList.add("show");
-  const results = searchSuggestions(query);
-  if(!results.length){
-    suggestBox.innerHTML = `<div class="suggest-empty">No matching fund or category found. Try a category like "Small Cap" or "ELSS", or an AMC name like "HDFC".</div>`;
-    suggestBox.hidden = false;
-    return;
+function wireSearchBox(searchInput, suggestBox, clearBtn){
+  function closeThis(){
+    suggestBox.hidden = true;
+    suggestBox.innerHTML = "";
+    clearBtn.classList.remove("show");
   }
-  suggestBox.innerHTML = results.map(r=>`
-    <button class="suggest-item" data-type="${r.type}" data-value="${esc(r.value)}">
-      <span class="tag ${r.type==="fund"?"fund":"cat"}">${r.type==="fund"?"Fund":"Category"}</span>
-      <span class="suggest-label">${esc(r.label)}</span>
-      <span class="suggest-meta">${esc(r.meta)}</span>
-    </button>`).join("");
-  suggestBox.hidden = false;
-  suggestBox.querySelectorAll(".suggest-item").forEach(btn=>{
-    btn.onclick = ()=>{
-      const {type, value} = btn.dataset;
-      closeSuggestions();
-      if(type==="fund") openFund(value); else openCategory(value);
-    };
-  });
-}
+  window._closeActiveSuggestions = closeThis;
 
-searchInput.addEventListener("input", e=>renderSuggestions(e.target.value));
-searchInput.addEventListener("focus", e=>{ if(e.target.value.trim()) renderSuggestions(e.target.value); });
-searchInput.addEventListener("keydown", e=>{ if(e.key==="Escape") closeSuggestions(); });
-clearBtn.addEventListener("click", ()=>{ searchInput.value=""; closeSuggestions(); searchInput.focus(); });
+  function renderSuggestions(query){
+    if(!query.trim()){ closeThis(); return; }
+    clearBtn.classList.add("show");
+    const results = searchSuggestions(query);
+    if(!results.length){
+      suggestBox.innerHTML = `<div class="suggest-empty">No matching fund or category found. Try a category like "Small Cap" or "ELSS", or an AMC name like "HDFC".</div>`;
+      suggestBox.hidden = false;
+      return;
+    }
+    suggestBox.innerHTML = results.map(r=>`
+      <button class="suggest-item" data-type="${r.type}" data-value="${esc(r.value)}">
+        <span class="tag ${r.type==="fund"?"fund":"cat"}">${r.type==="fund"?"Fund":"Category"}</span>
+        <span class="suggest-label">${esc(r.label)}</span>
+        <span class="suggest-meta">${esc(r.meta)}</span>
+      </button>`).join("");
+    suggestBox.hidden = false;
+    suggestBox.querySelectorAll(".suggest-item").forEach(btn=>{
+      btn.onclick = ()=>{
+        const {type, value} = btn.dataset;
+        closeThis();
+        if(type==="fund") goTo("fund", { name: value }); else goTo("category", { subCategory: value });
+      };
+    });
+  }
+
+  searchInput.addEventListener("input", e=>renderSuggestions(e.target.value));
+  searchInput.addEventListener("focus", e=>{ if(e.target.value.trim()) renderSuggestions(e.target.value); });
+  searchInput.addEventListener("keydown", e=>{ if(e.key==="Escape") closeThis(); });
+  clearBtn.addEventListener("click", ()=>{ searchInput.value=""; closeThis(); searchInput.focus(); });
+}
+function closeSuggestions(){ if(window._closeActiveSuggestions) window._closeActiveSuggestions(); }
 document.addEventListener("click", e=>{
   if(!e.target.closest(".search-shell")) closeSuggestions();
 });
 
-/* ---- boot ---- */
-renderHome();
+/* =====================================================================
+   FinBot — a small floating chat widget. It's a rule-based helper (no
+   live model call from this page), matching a typed question against
+   the FAQ_ITEMS knowledge base and, separately, against fund/category
+   names via searchSuggestions() — so "what's HDFC flexi cap fund's
+   NAV" both gets a quick pointer AND a direct link to that fund's page.
+   ===================================================================== */
+const finbotFab = document.getElementById("finbotFab");
+const finbotPanel = document.getElementById("finbotPanel");
+const finbotClose = document.getElementById("finbotClose");
+const finbotBody = document.getElementById("finbotBody");
+const finbotInput = document.getElementById("finbotInput");
+const finbotSend = document.getElementById("finbotSend");
+const finbotQuickRow = document.getElementById("finbotQuickRow");
+
+const FINBOT_STARTER_QUESTIONS = [
+  "What is Sharpe Ratio?",
+  "Direct vs Regular Plan?",
+  "How is Composite Score calculated?",
+  "What is CAGR?",
+];
+
+function finbotAppend(role, html){
+  const div = document.createElement("div");
+  div.className = "finbot-msg " + role;
+  div.innerHTML = html;
+  finbotBody.appendChild(div);
+  finbotBody.scrollTop = finbotBody.scrollHeight;
+}
+
+function finbotAnswer(query){
+  const q = query.trim();
+  if(!q) return;
+  finbotAppend("user", esc(q));
+
+  let bestItem=null, bestScore=0;
+  FAQ_ITEMS.forEach(item=>{
+    const target = item.keywords.join(" ") + " " + item.q;
+    const s = score(q, target);
+    if(s > bestScore){ bestScore = s; bestItem = item; }
+  });
+
+  const suggestions = searchSuggestions(q, 3);
+
+  if(bestScore >= 0.45){
+    let html = esc(bestItem.a);
+    if(suggestions.length){
+      html += `<div class="finbot-chip-row">` + suggestions.map(s=>
+        `<button class="finbot-chip" data-type="${s.type}" data-value="${esc(s.value)}">${s.type==="fund"?"📈":"🗂"} ${esc(s.label)}</button>`
+      ).join("") + `</div>`;
+    }
+    finbotAppend("bot", html);
+  } else if(suggestions.length){
+    let html = `Here's what I found on the site for "${esc(q)}":`;
+    html += `<div class="finbot-chip-row">` + suggestions.map(s=>
+      `<button class="finbot-chip" data-type="${s.type}" data-value="${esc(s.value)}">${s.type==="fund"?"📈":"🗂"} ${esc(s.label)}</button>`
+    ).join("") + `</div>`;
+    finbotAppend("bot", html);
+  } else {
+    finbotAppend("bot", `I couldn't match that to something in my FAQ or fund list. Try rephrasing, check the <button class="finbot-chip" id="finbotGoFaq" style="display:inline;">FAQ page</button>, or search a fund/category name directly on Home.`);
+    const goFaqBtn = document.getElementById("finbotGoFaq");
+    if(goFaqBtn) goFaqBtn.onclick = ()=>{ finbotClosePanel(); resetTo("faq"); };
+  }
+  wireFinbotChips();
+}
+
+function wireFinbotChips(){
+  finbotBody.querySelectorAll(".finbot-chip[data-type]").forEach(btn=>{
+    if(btn._wired) return;
+    btn._wired = true;
+    btn.onclick = ()=>{
+      const {type, value} = btn.dataset;
+      finbotClosePanel();
+      if(type==="fund") goTo("fund", { name: value }); else goTo("category", { subCategory: value });
+    };
+  });
+}
+
+function finbotRenderQuickRow(){
+  finbotQuickRow.innerHTML = FINBOT_STARTER_QUESTIONS.map(q=>
+    `<button class="finbot-chip">${esc(q)}</button>`
+  ).join("");
+  finbotQuickRow.querySelectorAll(".finbot-chip").forEach((btn,i)=>{
+    btn.onclick = ()=> finbotAnswer(FINBOT_STARTER_QUESTIONS[i]);
+  });
+}
+
+function finbotOpenPanel(){
+  finbotPanel.classList.add("open");
+  if(!finbotBody.dataset.greeted){
+    finbotAppend("bot", "Hi! I'm FinBot 👋 Ask me about fund terminology (Sharpe Ratio, CAGR, Drawdown...), Direct vs Regular plans, or type a fund/category name and I'll point you to it.");
+    finbotBody.dataset.greeted = "1";
+  }
+  finbotInput.focus();
+}
+function finbotClosePanel(){ finbotPanel.classList.remove("open"); }
+
+finbotFab.addEventListener("click", ()=>{
+  if(finbotPanel.classList.contains("open")) finbotClosePanel(); else finbotOpenPanel();
+});
+finbotClose.addEventListener("click", finbotClosePanel);
+finbotSend.addEventListener("click", ()=>{ finbotAnswer(finbotInput.value); finbotInput.value=""; });
+finbotInput.addEventListener("keydown", e=>{
+  if(e.key==="Enter"){ finbotAnswer(finbotInput.value); finbotInput.value=""; }
+});
+finbotRenderQuickRow();
+
+/* =====================================================================
+   Auto-resize the surrounding Streamlit iframe to match this page's
+   actual content height. app.py embeds this file via
+   st.components.v1.html(..., height=<fixed>), which otherwise leaves a
+   large empty band under the footer whenever a view (e.g. Home, or a
+   short category) is shorter than that fixed height. Since the
+   embedding iframe is same-origin (Streamlit renders it via `srcdoc`),
+   `window.frameElement` reaches the actual <iframe> element in the
+   parent document, so its height can be set directly to this page's
+   real scrollHeight — shrinking OR growing as the user navigates
+   between views. Wrapped in try/catch purely as a safety net in case a
+   future Streamlit version sandboxes this cross-origin, in which case
+   the iframe simply falls back to app.py's fixed height.
+   ===================================================================== */
+function reportHeight(){
+  try{
+    const fe = window.frameElement;
+    if(fe){
+      const h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+      fe.style.height = (h + 24) + "px";
+    }
+  }catch(err){ /* cross-origin iframe — fixed height from app.py stands */ }
+}
+let _heightTimer = null;
+function scheduleHeightReport(){
+  clearTimeout(_heightTimer);
+  _heightTimer = setTimeout(reportHeight, 60);
+}
+new ResizeObserver(scheduleHeightReport).observe(document.body);
+window.addEventListener("load", scheduleHeightReport);
+
+/* ---- boot: Home is always the starting screen ---- */
+render();
 </script>
 </body>
 </html>
