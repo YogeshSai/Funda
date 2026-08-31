@@ -285,8 +285,13 @@ html_code = (
     + html_code[end_idx:]
 )
 
-# height is generous and fixed, with scrolling enabled inside the
-# iframe -- the page's own content (category directory, expanded fund
-# lists, etc.) scrolls within that frame the same way it would in a
-# normal browser tab.
-components.html(html_code, height=2400, scrolling=True)
+# height is just the INITIAL size shown before fundfinder.html's own
+# auto-resize script runs (see the "Auto-resize the surrounding
+# Streamlit iframe" block at the bottom of that file's <script>): once
+# the page loads, it measures its own real content height and resizes
+# this iframe to match -- shrinking it for a short view (e.g. Home) and
+# growing it for a long one (e.g. "View all funds" in a big category) --
+# which is what removes the large empty scroll area a fixed height would
+# otherwise leave under the footer. scrolling is left off since the
+# whole page now sizes itself instead of scrolling inside a fixed frame.
+components.html(html_code, height=1100, scrolling=False)
