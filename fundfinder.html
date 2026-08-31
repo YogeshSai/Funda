@@ -101,6 +101,7 @@
 
   /* ---------- search ---------- */
   .search-shell{ position:relative; z-index:30; }
+  .search-shell.page-search{ margin:16px 0 22px; }
   .search-box{
     display:flex; align-items:center; gap:10px;
     background:var(--paper); border:2px solid var(--ink);
@@ -193,7 +194,7 @@
      accordion on the right to match that height too -- leaving a big
      blank gap under its collapsed content. Setting align-items:start
      makes each card size to its own content only. */
-  .asset-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
+  .asset-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; margin-bottom:0; }
   @media (max-width:640px){ .asset-grid{ grid-template-columns:1fr; } }
 
   details.asset-card{
@@ -316,6 +317,16 @@
   .verdict-badge.NEUTRAL{ background:#FBF0DC; color:#93610E; }
   .verdict-body{ font-size:0.92rem; line-height:1.55; margin:0 0 10px; }
   .verdict-disclaimer{ font-size:0.78rem; color:var(--ink-soft); font-style:italic; margin:0; }
+
+  /* ---------- about-this-fund / AI context card ---------- */
+  .context-card{
+    border:1.5px solid var(--ikat-teal); border-radius:var(--radius); padding:16px;
+    background:#F3FAF9; margin-bottom:22px;
+  }
+  .context-row{ margin:0 0 10px; font-size:0.92rem; line-height:1.55; }
+  .context-row:last-of-type{ margin-bottom:10px; }
+  .context-row b{ display:block; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--ikat-teal); margin-bottom:3px; font-weight:800; }
+  .context-disclaimer{ font-size:0.78rem; color:var(--ink-soft); font-style:italic; margin:0; }
 
   /* ---------- FAQ page ---------- */
   .faq-list{ display:flex; flex-direction:column; gap:10px; margin-bottom:8px; }
@@ -670,6 +681,34 @@ function renderBack(show){
   if(show) document.getElementById("backBtn").onclick = goBack;
 }
 
+/* ---------------------------------------------------------------------
+   Reusable search bar — the Home hero renders its own larger version
+   inline (see renderHome), but every other non-FAQ page gets this
+   compact bar so a fund/category is always one search away, no matter
+   where the user currently is in the site.
+   --------------------------------------------------------------------- */
+function renderPageSearchBar(placeholder){
+  return `
+    <div class="search-shell page-search" data-page-search="1">
+      <div class="search-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6E5B4E" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6"/></svg>
+        <input type="text" placeholder="${esc(placeholder||"Search a fund, AMC, or category")}" autocomplete="off">
+        <button class="clear-btn" aria-label="Clear search">✕</button>
+      </div>
+      <div class="suggest" hidden></div>
+    </div>`;
+}
+
+function wireAllSearchBars(){
+  window._activeSuggestionClosers = [];
+  mainArea.querySelectorAll('[data-page-search]').forEach(shell=>{
+    const input = shell.querySelector("input");
+    const suggestBox = shell.querySelector(".suggest");
+    const clearBtn = shell.querySelector(".clear-btn");
+    wireSearchBox(input, suggestBox, clearBtn);
+  });
+}
+
 /* ---- Home: hero + search + a handful of quick-pick categories ---- */
 function renderHome(){
   const quick = CATEGORIES
@@ -690,13 +729,13 @@ function renderHome(){
       <h1 class="headline">Search a fund like you'd <span class="accent telugu">బతుకమ్మ</span> gaddi —<br>pick, compare, decide.</h1>
       <p class="hero-sub">Type a fund name, an AMC, or a category — Large Cap, ELSS, Flexi Cap, whatever. No sign-up, no jargon overload, just the numbers a first-jobber in Hyderabad or a final-year student in Warangal actually needs before putting money in.</p>
 
-      <div class="search-shell">
+      <div class="search-shell" data-page-search="1">
         <div class="search-box">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6E5B4E" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6"/></svg>
-          <input id="searchInput" type="text" placeholder="Try 'HDFC Flexi Cap', 'ELSS', or 'Small Cap Fund'" autocomplete="off">
-          <button class="clear-btn" id="clearBtn" aria-label="Clear search">✕</button>
+          <input type="text" placeholder="Try 'HDFC Flexi Cap', 'ELSS', or 'Small Cap Fund'" autocomplete="off">
+          <button class="clear-btn" aria-label="Clear search">✕</button>
         </div>
-        <div class="suggest" id="suggestBox" hidden></div>
+        <div class="suggest" hidden></div>
       </div>
 
       <div class="quick-row">
@@ -706,11 +745,7 @@ function renderHome(){
     </section>`;
 
   mainArea.innerHTML = html;
-
-  const searchInput = document.getElementById("searchInput");
-  const suggestBox = document.getElementById("suggestBox");
-  const clearBtn = document.getElementById("clearBtn");
-  wireSearchBox(searchInput, suggestBox, clearBtn);
+  wireAllSearchBars();
 
   mainArea.querySelectorAll(".quick-chip").forEach(btn=>{
     btn.onclick = ()=> goTo("category", { subCategory: btn.dataset.cat });
@@ -724,6 +759,7 @@ function renderBrowse(){
   let html = `
     <h2 class="page-title">Browse by Category</h2>
     <p class="page-sub">Pick an Asset Type to see its Sub Categories, then tap one to see every mutual fund we track in it.</p>
+    ${renderPageSearchBar("Search a fund, AMC, or category")}
     <div class="asset-grid">`;
   dirs.forEach(d=>{
     html += `<details class="asset-card"><summary>${esc(d.assetType)}<span class="count">${d.subs.length} categories</span></summary>
@@ -735,6 +771,7 @@ function renderBrowse(){
   });
   html += `</div>`;
   mainArea.innerHTML = html;
+  wireAllSearchBars();
   mainArea.querySelectorAll(".subcat-btn").forEach(btn=>{
     btn.onclick = ()=> goTo("category", { subCategory: btn.dataset.cat });
   });
@@ -761,13 +798,11 @@ const TOP_N = 5;
 
 /* Collapse a sorted fund list down to at most one fund per AMC, keeping
    whichever appears first (i.e. the best-ranked one, since the caller
-   sorts by compositeScore descending before calling this). Mirrors the
-   backend's top_funds() AMC dedup (finance_bot.py) so the "Top funds"
-   view here shows one fund per fund-house rather than letting a single
-   AMC's multiple funds crowd out the rest of the category. Only applied
-   to the compact "Top N" view -- "View all" intentionally still shows
-   every fund from every AMC, since that button promises literally all
-   funds in the category. */
+   sorts by compositeScore descending before calling this). Applied to
+   EVERY category listing view (compact top list AND "view all") so a
+   category page never shows two cards from the same fund house side by
+   side — the full dataset is never touched by this, and every specific
+   fund/plan/option is still one search away via the search bar. */
 function dedupeByAmc(sortedFunds){
   const seen = new Set();
   const out = [];
@@ -786,15 +821,24 @@ function renderCategoryView(subCategory, showAll){
   const allSorted = FUNDS.filter(f=>f.subCategoryRaw===subCategory)
                     .slice()
                     .sort((a,b)=>b.compositeScore-a.compositeScore);
-  const topPool = dedupeByAmc(allSorted);
-  const subset = showAll ? allSorted : topPool.slice(0, TOP_N);
+  // One fund per AMC, highest-ranked kept — applied everywhere on this
+  // page, not just the compact view. The full list of AMCs/funds in
+  // this category is never reduced in the underlying FUNDS data; a
+  // specific fund (or a different plan/option of one already shown
+  // here) is always findable via the search bar above.
+  const dedupedSorted = dedupeByAmc(allSorted);
+  const subset = showAll ? dedupedSorted : dedupedSorted.slice(0, TOP_N);
   const heading = showAll ? "All funds in" : "Top funds in";
+  const ampNote = allSorted.length > dedupedSorted.length
+    ? ` One fund per AMC is shown (highest ranked) — search above for a specific fund or share class.`
+    : ``;
   const note = showAll
-    ? `${allSorted.length} fund${allSorted.length===1?"":"s"} · every fund we have in this category, ranked by composite score. Tap a fund for the full sheet.`
-    : `Showing top ${subset.length} of ${allSorted.length} · one fund per AMC, ranked by composite score (return, risk-adjusted return, drawdown &amp; volatility vs. category peers). Tap a fund for the full sheet.`;
+    ? `${dedupedSorted.length} fund${dedupedSorted.length===1?"":"s"} · one per AMC, every AMC we have in this category, ranked by composite score.${ampNote} Tap a fund for the full sheet.`
+    : `Showing top ${subset.length} of ${dedupedSorted.length} AMCs · one fund per AMC, ranked by composite score (return, risk-adjusted return, drawdown &amp; volatility vs. category peers).${ampNote} Tap a fund for the full sheet.`;
 
   let html = `<h2 class="cat-heading">${heading} <span class="cat-name">${esc(label)}</span></h2>
-    <p class="cat-note">${note}</p>`;
+    <p class="cat-note">${note}</p>
+    ${renderPageSearchBar("Search a fund, AMC, or category")}`;
 
   if(subset.length === 0){
     html += `<p class="empty-note">No funds found in this category.</p>`;
@@ -820,13 +864,14 @@ function renderCategoryView(subCategory, showAll){
     </div>`;
   });
 
-  if(!showAll && allSorted.length > subset.length){
-    html += `<button class="view-all-btn" id="viewAllBtn">View all ${allSorted.length} funds in ${esc(label)}</button>`;
-  } else if(showAll && allSorted.length){
+  if(!showAll && dedupedSorted.length > subset.length){
+    html += `<button class="view-all-btn" id="viewAllBtn">View all ${dedupedSorted.length} AMCs in ${esc(label)}</button>`;
+  } else if(showAll && dedupedSorted.length){
     html += `<button class="view-all-btn" id="viewTopBtn">Show top performers only</button>`;
   }
 
   mainArea.innerHTML = html;
+  wireAllSearchBars();
   mainArea.querySelectorAll(".fund-name-btn").forEach(btn=>{
     btn.onclick = ()=> goTo("fund", { name: btn.dataset.fund });
   });
@@ -861,6 +906,72 @@ function buildVerdict(f){
     body = `Numbers here are mixed: a 3-year CAGR of ${cagr3y} against a drawdown of ${mdd} and a Sharpe ratio of ${sharpe} don't clearly lean either way. It's placed in the ${pctile} against peers — middling rather than standout. Worth weighing against your own goals and time horizon rather than the numbers alone.`;
   }
   return {verdict, body};
+}
+
+/* ---------------------------------------------------------------------
+   "About This Fund" AI context card — a short, rule-based read of what
+   the fund's own category implies about (a) what it typically invests
+   in, and (b) which broad age/life-stage group it tends to suit. Built
+   entirely from assetType/subCategoryLabel (no live model call), same
+   spirit as the AI Verdict: automated and clearly labelled as such,
+   not personalised advice.
+   --------------------------------------------------------------------- */
+function buildFundContext(f){
+  const label = (f.subCategoryLabel||"").toLowerCase();
+  const asset = f.assetType||"";
+  let about, investsIn, suitableFor;
+
+  if(asset==="Equity" && /elss/.test(label)){
+    about = `${f.name} is an ELSS (Equity Linked Savings Scheme) — an equity mutual fund that also qualifies for tax deduction under Section 80C, with a mandatory 3-year lock-in.`;
+    investsIn = `Primarily listed Indian equities across market caps, chosen for long-term growth, with the 3-year lock-in encouraging a longer holding period than most open-ended equity funds.`;
+    suitableFor = `Working professionals looking to combine tax-saving with equity exposure — generally suits investors in their 20s-45s who won't need the money for at least 3 years and can tolerate equity-level ups and downs.`;
+  } else if(asset==="Equity" && /small cap/.test(label)){
+    about = `${f.name} is an Equity Small Cap fund, investing in smaller, less-established listed companies.`;
+    investsIn = `Predominantly small-cap stocks — higher growth potential, but also higher volatility and steeper drawdowns than large or mid-cap funds.`;
+    suitableFor = `Younger investors (typically 20s-30s) with a long horizon (7+ years) and a high risk appetite, since small-cap funds can swing sharply in the short-to-medium term.`;
+  } else if(asset==="Equity" && /mid cap/.test(label)){
+    about = `${f.name} is an Equity Mid Cap fund, investing in mid-sized listed companies that sit between large, established firms and smaller small-cap names.`;
+    investsIn = `Mid-cap stocks, aiming to capture growth in scaling businesses with more risk than large-cap funds but generally less volatility than small-cap funds.`;
+    suitableFor = `Investors roughly in their late 20s to 40s with a medium-to-long horizon (5-7+ years) and a moderately high risk tolerance.`;
+  } else if(asset==="Equity" && /large cap/.test(label)){
+    about = `${f.name} is an Equity Large Cap fund, investing mainly in India's biggest, most established listed companies.`;
+    investsIn = `Blue-chip, large-cap stocks — generally more stable than mid/small-cap funds, though still subject to overall equity market swings.`;
+    suitableFor = `A wide range of investors, including those newer to equity investing or in their 30s-50s, wanting equity growth with comparatively lower volatility than small/mid-cap funds.`;
+  } else if(asset==="Equity" && /flexi|multi cap/.test(label)){
+    about = `${f.name} is a Flexi/Multi Cap equity fund, free to move across large, mid, and small-cap stocks depending on where the fund manager sees opportunity.`;
+    investsIn = `A dynamic mix of large, mid, and small-cap Indian equities, rebalanced over time rather than fixed to one market-cap band.`;
+    suitableFor = `Investors in their late 20s to 50s who want diversified equity exposure without picking a market-cap segment themselves, and who have a 5+ year horizon.`;
+  } else if(asset==="Equity" && /sector|thematic/.test(label)){
+    about = `${f.name} is a Sectoral/Thematic equity fund, concentrated in one industry or investment theme rather than diversified across the market.`;
+    investsIn = `Stocks from a single sector or theme (e.g. banking, technology, infrastructure) — concentrated bets that rise or fall with that sector's fortunes.`;
+    suitableFor = `Experienced investors who already understand the specific sector's cycles and are comfortable with concentration risk — usually a smaller, satellite portion of a portfolio rather than a core holding, regardless of age.`;
+  } else if(asset==="Equity"){
+    about = `${f.name} is an Equity fund (${f.subCategoryLabel}), investing mainly in listed Indian company shares.`;
+    investsIn = `Predominantly equities, with the specific style/market-cap focus described by its category (${f.subCategoryLabel}).`;
+    suitableFor = `Investors with a medium-to-long horizon (5+ years) who can tolerate equity market volatility — generally better suited to younger to middle-aged investors, or anyone investing for a distant goal.`;
+  } else if(asset==="Debt"){
+    about = `${f.name} is a Debt fund (${f.subCategoryLabel}), investing in fixed-income instruments rather than company shares.`;
+    investsIn = `Government securities, corporate bonds, money-market instruments, or similar fixed-income paper — return and risk depend heavily on interest-rate movements and the credit quality of the underlying paper.`;
+    suitableFor = `Conservative investors, those with a shorter horizon (under 3-5 years), or investors nearing/in retirement who prioritise capital stability and steadier (if more modest) returns over growth.`;
+  } else if(asset==="Hybrid"){
+    about = `${f.name} is a Hybrid fund (${f.subCategoryLabel}), blending equity and debt in a single portfolio.`;
+    investsIn = `A mix of equities (for growth) and debt instruments (for stability), in a proportion defined by the fund's specific mandate.`;
+    suitableFor = `Investors who want some equity growth potential without full equity volatility — often a good fit for middle-aged investors (30s-55s) or first-time investors easing into market-linked products.`;
+  } else if(asset==="Index ETF"){
+    about = `${f.name} is an Index Fund/ETF (${f.subCategoryLabel}), designed to passively track a market index rather than have a manager actively pick stocks/bonds.`;
+    investsIn = `The same securities, in the same proportions, as its underlying benchmark index — returns broadly mirror the index (minus a small tracking cost) rather than trying to beat it.`;
+    suitableFor = `Cost-conscious, long-term investors of pretty much any age who are comfortable with index-level (usually equity-market) volatility and don't want to rely on active fund-manager selection.`;
+  } else if(asset==="Solution Oriented"){
+    about = `${f.name} is a Solution Oriented fund (${f.subCategoryLabel}), built around a specific life goal (e.g. retirement or a child's future) and typically carries a lock-in.`;
+    investsIn = `A mix of equity and debt calibrated to the goal's time horizon — often more equity-heavy early on and more conservative closer to the goal.`;
+    suitableFor = `Investors specifically saving for that goal — e.g. retirement-oriented plans generally suit those in their 30s-50s planning ahead, while children's plans suit parents/guardians saving for a child's future milestones.`;
+  } else {
+    about = `${f.name} falls under ${f.assetType} / ${f.subCategoryLabel} in this dataset.`;
+    investsIn = `Its underlying holdings follow the mandate implied by this category — check the fund's official factsheet for the precise portfolio breakdown.`;
+    suitableFor = `Suitability depends on your own goals, horizon, and risk appetite — there's no one-size-fits-all age group for this category.`;
+  }
+
+  return {about, investsIn, suitableFor};
 }
 
 /* Plan display order: Direct first (lower expense ratio, what most
@@ -907,9 +1018,14 @@ function renderPlans(f){
 /* ---- Fund profile view ---- */
 function renderFundView(name){
   const f = FUNDS.find(x=>x.name===name);
-  if(!f){ mainArea.innerHTML = `<p class="empty-note">Couldn't find "${esc(name)}" in the dataset.</p>`; return; }
+  if(!f){
+    mainArea.innerHTML = `${renderPageSearchBar("Search a fund, AMC, or category")}<p class="empty-note">Couldn't find "${esc(name)}" in the dataset.</p>`;
+    wireAllSearchBars();
+    return;
+  }
 
-  let html = `<h2 class="profile-title">${esc(f.name)}</h2>
+  let html = `${renderPageSearchBar("Search a fund, AMC, or category")}
+    <h2 class="profile-title">${esc(f.name)}</h2>
     <p class="profile-sub">${esc(f.amc)}</p>
     <ul class="basic-list">
       <li><b>Category:</b> ${esc(f.subCategoryLabel)}</li>
@@ -948,6 +1064,15 @@ function renderFundView(name){
 
   html += renderPlans(f);
 
+  const ctx = buildFundContext(f);
+  html += `<div class="section-label" style="margin-top:8px;">About This Fund</div>
+    <div class="context-card">
+      <p class="context-row"><b>What it is</b>${esc(ctx.about)}</p>
+      <p class="context-row"><b>Where it generally invests</b>${esc(ctx.investsIn)}</p>
+      <p class="context-row"><b>Who it tends to suit</b>${esc(ctx.suitableFor)}</p>
+      <p class="context-disclaimer">Automated, rule-based read derived from this fund's category only — not a live AI model call, and not personalised financial advice. Please check the fund's official factsheet and consider your own goals before investing.</p>
+    </div>`;
+
   const {verdict, body} = buildVerdict(f);
   html += `<div class="section-label" style="margin-top:8px;">AI Verdict</div>
     <div class="verdict-card">
@@ -957,10 +1082,11 @@ function renderFundView(name){
     </div>`;
 
   mainArea.innerHTML = html;
+  wireAllSearchBars();
 }
 
 /* ---------------------------------------------------------------------
-   Search box + live suggestions — wired fresh each time Home renders,
+   Search box + live suggestions — wired fresh each time a view renders,
    since mainArea.innerHTML is fully replaced on every view change.
    --------------------------------------------------------------------- */
 function wireSearchBox(searchInput, suggestBox, clearBtn){
@@ -969,7 +1095,7 @@ function wireSearchBox(searchInput, suggestBox, clearBtn){
     suggestBox.innerHTML = "";
     clearBtn.classList.remove("show");
   }
-  window._closeActiveSuggestions = closeThis;
+  window._closeActiveSuggestions = window._closeActiveSuggestions || [];
 
   function renderSuggestions(query){
     if(!query.trim()){ closeThis(); return; }
@@ -1000,8 +1126,14 @@ function wireSearchBox(searchInput, suggestBox, clearBtn){
   searchInput.addEventListener("focus", e=>{ if(e.target.value.trim()) renderSuggestions(e.target.value); });
   searchInput.addEventListener("keydown", e=>{ if(e.key==="Escape") closeThis(); });
   clearBtn.addEventListener("click", ()=>{ searchInput.value=""; closeThis(); searchInput.focus(); });
+
+  closeThis._owner = searchInput;
+  window._activeSuggestionClosers = window._activeSuggestionClosers || [];
+  window._activeSuggestionClosers.push(closeThis);
 }
-function closeSuggestions(){ if(window._closeActiveSuggestions) window._closeActiveSuggestions(); }
+function closeSuggestions(){
+  (window._activeSuggestionClosers||[]).forEach(fn=>fn());
+}
 document.addEventListener("click", e=>{
   if(!e.target.closest(".search-shell")) closeSuggestions();
 });
