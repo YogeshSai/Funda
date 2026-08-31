@@ -832,8 +832,8 @@ function renderCategoryView(subCategory, showAll){
     ? ` One fund per AMC is shown (highest ranked) — search above for a specific fund or share class.`
     : ``;
   const note = showAll
-    ? `${dedupedSorted.length} fund${dedupedSorted.length===1?"":"s"} · one per AMC, every AMC we have in this category, ranked by composite score.${ampNote} Tap a fund for the full sheet.`
-    : `Showing top ${subset.length} of ${dedupedSorted.length} AMCs · one fund per AMC, ranked by composite score (return, risk-adjusted return, drawdown &amp; volatility vs. category peers).${ampNote} Tap a fund for the full sheet.`;
+    ? `${dedupedSorted.length} fund${dedupedSorted.length===1?"":"s"} ·, ranked by composite score.${ampNote} Tap a fund for the full sheet.`
+    : `Showing top ${subset.length} of ${dedupedSorted.length} AMCs · ranked by composite score (return, risk-adjusted return, drawdown &amp; volatility vs. category peers).${ampNote} Tap a fund for the full sheet.`;
 
   let html = `<h2 class="cat-heading">${heading} <span class="cat-name">${esc(label)}</span></h2>
     <p class="cat-note">${note}</p>
