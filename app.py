@@ -2,35 +2,6 @@
 app.py
 ------
 Streamlit entry point for FundFinder.
-
-The site itself (search box with live, as-you-type suggestions,
-category browser, fund profile pages) lives in fundfinder.html, a
-single self-contained HTML/CSS/JS file sitting next to this script.
-It stays a plain HTML/JS page -- rather than being rebuilt as
-st.text_input + st.button widgets -- because Streamlit reruns the
-whole script on every widget interaction, which is too slow/round-
-trippy for instant, character-by-character search suggestions. This
-file's job is to (1) load & shape the real fund data using
-finance_bot.FinanceBot, (2) inject that data as JSON into the
-fundfinder.html marker, and (3) embed the resulting page via
-st.components.v1.html so the browser runs it exactly as it would
-standalone.
-
-Folder layout expected:
-    app.py                <- this file
-    fundfinder.html       <- the website
-    finance_bot.py        <- data loading / shaping logic
-    nlp_utils.py
-    llm_fallback.py
-    MF_Risk_Metrics.xlsx
-    requirements.txt
-
-Run locally:
-    streamlit run app.py
-
-Deploy on Streamlit Community Cloud:
-    Push all files (plus requirements.txt) to a GitHub repo, then
-    point Community Cloud at app.py -- no other setup needed.
 """
 import json
 import math
@@ -55,12 +26,21 @@ st.set_page_config(page_title="FundFinder", page_icon="📈", layout="wide")
 # hamburger menu, a "Made with Streamlit" footer). Hidden here so the
 # embedded site can use the full browser window like a normal
 # standalone website rather than sitting inside a framed widget.
+#
+# NOTE: these were previously hidden with `visibility: hidden`, which
+# keeps an element's box in the page's layout flow -- it just makes the
+# box invisible, it does NOT collapse the space that box reserves. That
+# left Streamlit's own header/footer chrome silently reserving a strip
+# of blank space above/below our embedded iframe on every page, which
+# read as "extra empty space at the bottom" especially on shorter pages
+# like Browse by Category. `display: none` removes the element from
+# layout entirely, so no reserved space is left behind.
 st.markdown(
     """
     <style>
-      #MainMenu, header, footer {visibility: hidden;}
+      #MainMenu, header, footer {display: none !important;}
       .block-container {padding: 0 !important; margin: 0 !important; max-width: 100% !important;}
-      iframe {width: 100%; border: none;}
+      iframe {width: 100%; border: none; display: block;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -70,28 +50,17 @@ HTML_PATH = pathlib.Path(__file__).parent / "fundfinder.html"
 FUND_DATA_START_MARKER = "/*__FUND_DATA_JSON__*/"
 FUND_DATA_END_MARKER = "/*__END_FUND_DATA_JSON__*/"
 
-# Horizons the site's fund cards / profile pages show returns for.
 RETURN_HORIZONS = ["1D", "6M", "1Y", "3Y", "5Y"]
-# For horizons where the sheet only has an annualised CAGR (no observed
-# absolute return), fall back to CAGR rather than showing a blank.
 RETURN_FALLBACK_COL = {
     "1Y": "1Y_CAGR",
     "3Y": "3Y_CAGR",
     "5Y": "5Y_CAGR",
 }
 
-# How many funds to show per Sub Category / AMC combo on the site's
-# category and search-result screens. See TOP_N_PER_CATEGORY below --
-# the actual "top N" cut is applied client-side in fundfinder.html, but
-# every record carries a peerRank/compositeScore so the JS can sort and
-# slice consistently with this number. Kept here as the single source
-# of truth so a future JS change can read it via the injected JSON
-# instead of a second hardcoded constant.
 TOP_N_PER_CATEGORY = 5
 
 
 def _num_or_none(v):
-    """Convert a pandas scalar to a JSON-safe float or None."""
     if v is None:
         return None
     try:
@@ -109,25 +78,6 @@ def _num_or_none(v):
 
 
 def _build_category_lookups(bot: FinanceBot) -> dict:
-    """FinanceBot's own asset_type_to_subcats already solved the
-    "duplicate Sub Category" problem for its directory: every raw
-    Sub Category value in the dataset -- including exact wrapper
-    duplicates ("Open Ended Schemes(...)" vs "Close Ended
-    Schemes(...)") AND near-duplicate wording variants ("Banking and
-    PSU Fund" vs "Banking and PSU Debt Fund") -- is mapped onto one
-    canonical representative raw value via bot.subcat_canonical_map.
-
-    fundfinder.html's own CATEGORIES step, though, groups funds by
-    whatever raw subCategoryRaw string each record carries -- so if we
-    send each fund's *original* raw value through, every raw variant
-    still shows up as its own category client-side, even though the
-    labels are identical (or near-identical). The fix: re-key every
-    fund onto its canonical raw value before it ever reaches the JSON,
-    so the JS's per-raw-value grouping produces the same deduped result
-    FinanceBot's own directory does.
-
-    Returns canonical raw value -> asset type.
-    """
     asset_type_by_raw: dict = {}
     for asset_type, subcats in bot.asset_type_to_subcats.items():
         for sc in subcats:
@@ -136,15 +86,6 @@ def _build_category_lookups(bot: FinanceBot) -> dict:
 
 
 def build_fund_records(bot: FinanceBot) -> list[dict]:
-    # Groups every row by underlying fund identity (ignoring Plan/Option)
-    # and picks ONE primary row per fund -- Direct plan preferred, then
-    # Growth option -- exactly like the old dedup_funds_keep_direct()
-    # step did. The difference: every OTHER row in that group (Regular
-    # plan, IDCW payout frequencies like Daily/Weekly/Monthly, ...) is
-    # kept alongside the primary as a labeled "variant" instead of being
-    # silently dropped, so the site can show them as "Additional
-    # investment options" on the fund's own page rather than as separate,
-    # seemingly-duplicate fund cards.
     groups = group_funds_with_variants(bot.df.copy())
     asset_type_by_raw = _build_category_lookups(bot)
     canonical_map = bot.subcat_canonical_map
@@ -162,10 +103,9 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
         fields = describe_variant_fields(r.get("Scheme Name", ""))
         return {
             "name": str(r.get("Scheme Name", "")),
-            "plan": fields["plan"],           # "Direct" | "Regular" | ""
-            "option": fields["option"],       # "Growth" | "IDCW" | "Dividend" |
-                                               # "Income Distribution cum Capital Withdrawal" | "Other"
-            "frequency": fields["frequency"],  # "Daily" | "Weekly" | "Monthly" | "Quarterly" | ... | ""
+            "plan": fields["plan"],
+            "option": fields["option"],
+            "frequency": fields["frequency"],
             "nav": _num_or_none(r.get("Latest NAV")),
             "isCurrent": is_current,
         }
@@ -177,10 +117,6 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
         if pd.isna(sub_cat_raw):
             continue
 
-        # Re-key onto the canonical raw value for this category -- see
-        # _build_category_lookups above. Falls back to the row's own raw
-        # value if it somehow isn't in the map (shouldn't happen, but
-        # keeps a fund visible rather than dropping it).
         sub_cat_raw = canonical_map.get(sub_cat_raw, sub_cat_raw)
         label = subcat_browse_label(sub_cat_raw)
 
@@ -191,10 +127,6 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
 
         peer_rank = _num_or_none(row.get("Peer_Rank"))
 
-        # Every other Plan/Option this same underlying fund is also sold
-        # under (Regular plan, IDCW payout frequencies, ...) -- shown by
-        # the site under an "Additional investment options" sub-heading
-        # on the fund's own page/card, not as separate top-level funds.
         additional_options = [
             {
                 "label": describe_variant_label(v.get("Scheme Name", "")),
@@ -204,14 +136,6 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
             for v in group["variants"]
         ]
 
-        # Structured Plan / Option / IDCW-frequency breakdown for EVERY
-        # purchasable combination of this underlying fund, including the
-        # primary row itself (isCurrent=True) -- lets the site render a
-        # "Plan: Direct/Regular", "Option: Growth/IDCW/Dividend/...",
-        # "IDCW frequency: Daily/Weekly/Monthly/..." breakdown grouped by
-        # Plan, rather than re-deriving this client-side from raw scheme
-        # names. additionalOptions above is kept for backward
-        # compatibility with any existing JS that already reads it.
         plans = [_plan_entry(row, is_current=True)] + [
             _plan_entry(v, is_current=False) for v in group["variants"]
         ]
@@ -244,8 +168,6 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
 def load_fund_json() -> str:
     bot = FinanceBot()
     records = build_fund_records(bot)
-    # Escape "</" so a stray "</script>"-like substring in any fund name
-    # can't break out of the inline <script> tag it's embedded in.
     return json.dumps(records, ensure_ascii=False).replace("</", "<\\/")
 
 
@@ -285,13 +207,4 @@ html_code = (
     + html_code[end_idx:]
 )
 
-# height is just the INITIAL size shown before fundfinder.html's own
-# auto-resize script runs (see the "Auto-resize the surrounding
-# Streamlit iframe" block at the bottom of that file's <script>): once
-# the page loads, it measures its own real content height and resizes
-# this iframe to match -- shrinking it for a short view (e.g. Home) and
-# growing it for a long one (e.g. "View all funds" in a big category) --
-# which is what removes the large empty scroll area a fixed height would
-# otherwise leave under the footer. scrolling is left off since the
-# whole page now sizes itself instead of scrolling inside a fixed frame.
 components.html(html_code, height=1100, scrolling=False)
