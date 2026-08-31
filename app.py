@@ -40,7 +40,13 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-from finance_bot import FinanceBot, clean_subcat_label, dedup_funds_keep_direct, subcat_browse_label
+from finance_bot import (
+    FinanceBot,
+    clean_subcat_label,
+    describe_variant_label,
+    group_funds_with_variants,
+    subcat_browse_label,
+)
 
 st.set_page_config(page_title="FundFinder", page_icon="📈", layout="wide")
 
@@ -92,63 +98,69 @@ def _num_or_none(v):
     return f
 
 
-def _build_category_lookups(bot: FinanceBot) -> tuple[dict, dict]:
+def _build_category_lookups(bot: FinanceBot) -> dict:
     """FinanceBot's own asset_type_to_subcats already solved the
-    "duplicate Sub Category" problem for its directory: for every
-    cleaned label (e.g. "Large Cap Fund"), it picks ONE representative
-    raw Sub Category value to stand in for every raw variant that
-    cleans down to that label (e.g. both an "Open Ended Schemes(...)"
-    and a "Close Ended Schemes(...)" raw string).
+    "duplicate Sub Category" problem for its directory: every raw
+    Sub Category value in the dataset -- including exact wrapper
+    duplicates ("Open Ended Schemes(...)" vs "Close Ended
+    Schemes(...)") AND near-duplicate wording variants ("Banking and
+    PSU Fund" vs "Banking and PSU Debt Fund") -- is mapped onto one
+    canonical representative raw value via bot.subcat_canonical_map.
 
     fundfinder.html's own CATEGORIES step, though, groups funds by
     whatever raw subCategoryRaw string each record carries -- so if we
     send each fund's *original* raw value through, every raw variant
     still shows up as its own category client-side, even though the
-    labels are identical. The fix: re-key every fund onto that same
-    representative raw value (by cleaned label) before it ever reaches
-    the JSON, so the JS's per-raw-value grouping produces the same
-    deduped result FinanceBot's own directory does.
+    labels are identical (or near-identical). The fix: re-key every
+    fund onto its canonical raw value before it ever reaches the JSON,
+    so the JS's per-raw-value grouping produces the same deduped result
+    FinanceBot's own directory does.
 
-    Returns (label -> canonical raw value, canonical raw value -> asset type).
+    Returns canonical raw value -> asset type.
     """
-    canonical_raw_by_label: dict = {}
     asset_type_by_raw: dict = {}
     for asset_type, subcats in bot.asset_type_to_subcats.items():
         for sc in subcats:
-            label = subcat_browse_label(sc)
-            canonical_raw_by_label.setdefault(label, sc)
             asset_type_by_raw[sc] = asset_type
-    return canonical_raw_by_label, asset_type_by_raw
+    return asset_type_by_raw
 
 
 def build_fund_records(bot: FinanceBot) -> list[dict]:
-    # Collapses both payout-option variants (Growth/IDCW/Dividend) AND
-    # plan-type variants (Direct/Regular) down to one row per underlying
-    # fund, preferring Direct -- so the site shows a single listing per
-    # fund rather than one row per plan.
-    df = dedup_funds_keep_direct(bot.df.copy())
-    canonical_raw_by_label, asset_type_by_raw = _build_category_lookups(bot)
+    # Groups every row by underlying fund identity (ignoring Plan/Option)
+    # and picks ONE primary row per fund -- Direct plan preferred, then
+    # Growth option -- exactly like the old dedup_funds_keep_direct()
+    # step did. The difference: every OTHER row in that group (Regular
+    # plan, IDCW payout frequencies like Daily/Weekly/Monthly, ...) is
+    # kept alongside the primary as a labeled "variant" instead of being
+    # silently dropped, so the site can show them as "Additional
+    # investment options" on the fund's own page rather than as separate,
+    # seemingly-duplicate fund cards.
+    groups = group_funds_with_variants(bot.df.copy())
+    asset_type_by_raw = _build_category_lookups(bot)
+    canonical_map = bot.subcat_canonical_map
 
-    records = []
-    for _, row in df.iterrows():
-        sub_cat_raw = row.get("Sub Category")
-        if pd.isna(sub_cat_raw):
-            continue
-
-        # Re-key onto the canonical raw value for this category's
-        # cleaned label -- see _build_category_lookups above. Falls
-        # back to the row's own raw value if its label somehow isn't
-        # in the map (shouldn't happen, but keeps a fund visible
-        # rather than dropping it).
-        label = subcat_browse_label(sub_cat_raw)
-        sub_cat_raw = canonical_raw_by_label.get(label, sub_cat_raw)
-
+    def _returns_for(row) -> dict:
         returns = {}
         for horizon in RETURN_HORIZONS:
             col = f"{horizon}_AbsoluteReturn"
             if col not in row.index or pd.isna(row.get(col)):
                 col = RETURN_FALLBACK_COL.get(horizon)
             returns[horizon] = _num_or_none(row.get(col)) if col else None
+        return returns
+
+    records = []
+    for group in groups:
+        row = group["primary"]
+        sub_cat_raw = row.get("Sub Category")
+        if pd.isna(sub_cat_raw):
+            continue
+
+        # Re-key onto the canonical raw value for this category -- see
+        # _build_category_lookups above. Falls back to the row's own raw
+        # value if it somehow isn't in the map (shouldn't happen, but
+        # keeps a fund visible rather than dropping it).
+        sub_cat_raw = canonical_map.get(sub_cat_raw, sub_cat_raw)
+        label = subcat_browse_label(sub_cat_raw)
 
         peer_pctile_col = "3Y_CAGR_PeerPctile"
         peer_pctile = _num_or_none(row.get(peer_pctile_col))
@@ -157,6 +169,19 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
 
         peer_rank = _num_or_none(row.get("Peer_Rank"))
 
+        # Every other Plan/Option this same underlying fund is also sold
+        # under (Regular plan, IDCW payout frequencies, ...) -- shown by
+        # the site under an "Additional investment options" sub-heading
+        # on the fund's own page/card, not as separate top-level funds.
+        additional_options = [
+            {
+                "label": describe_variant_label(v.get("Scheme Name", "")),
+                "name": str(v.get("Scheme Name", "")),
+                "nav": _num_or_none(v.get("Latest NAV")),
+            }
+            for v in group["variants"]
+        ]
+
         records.append({
             "name": str(row.get("Scheme Name", "")),
             "amc": str(row.get("AMC (Fund House)", "")) if not pd.isna(row.get("AMC (Fund House)")) else "",
@@ -164,7 +189,7 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
             "subCategoryRaw": str(sub_cat_raw),
             "subCategoryLabel": label,
             "nav": _num_or_none(row.get("Latest NAV")),
-            "returns": returns,
+            "returns": _returns_for(row),
             "risk": {
                 "vol": _num_or_none(row.get("3Y_Volatility")),
                 "mdd": _num_or_none(row.get("3Y_MaxDrawdown")),
@@ -175,6 +200,7 @@ def build_fund_records(bot: FinanceBot) -> list[dict]:
             "peerPctile": peer_pctile,
             "compositeScore": _num_or_none(row.get("Composite_Score")),
             "peerRank": int(peer_rank) if peer_rank is not None else None,
+            "additionalOptions": additional_options,
         })
     return records
 
