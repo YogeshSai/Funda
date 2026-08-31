@@ -4,21 +4,10 @@ data_pipeline.py
 Turns the raw "Risk Metrics" sheet of MF_Risk_Metrics.xlsx into a
 compact list of fund records ready to embed in fundfinder.html.
 
-Applies the same cleaning rules finance_bot.py already established for
-this exact sheet:
-  - mojibake repair (a few cells were saved through the wrong encoding)
-  - ELSS spelling merge ("ELSS" vs "ELSS Tax Saver Fund")
-  - plan/option dedup (the same underlying fund appears once per
-    Growth/IDCW/Dividend payout option; collapsed down to one row,
-    preferring Growth)
-  - asset-type inference from the Sub Category text itself, since the
-    sheet's own Asset Class column mis-tags a meaningful number of rows
-
-Only rows with a usable Composite_Score/Peer_Rank are kept, since those
-are what every ranking and "AI Verdict" on the site depends on.
-
-Pure functions only, no Streamlit or network calls -- app.py handles
-fetching the bytes and caching.
+FIX: _OPTION_PHRASES now also strips the bare word "option" (see the
+matching note in finance_bot.py) so a "... Growth Option" row and its
+"... IDCW" sibling collapse to the same dedup key here too, instead of
+surviving as two separate top-level fund records.
 """
 
 from __future__ import annotations
@@ -64,6 +53,11 @@ _OPTION_PHRASES = [
     "payout and re-investment of income distribution cum capital withdrawal option",
     "income distribution cum capital withdrawal option",
     "idcw", "dividend", "growth", "payout", "reinvestment", "bonus",
+    # Generic qualifying word left over after stripping the option name
+    # itself (e.g. "Growth Option") -- without this, "... Growth Option"
+    # and its "... IDCW" (no trailing "Option" word) sibling produced
+    # different dedup keys and survived as two separate fund records.
+    "option",
 ]
 
 
@@ -150,13 +144,8 @@ def build_fund_records(xlsx_bytes: bytes) -> list[dict]:
             df[col] = df[col].apply(lambda v: v.strip() if isinstance(v, str) else v)
     df["Sub Category"] = df["Sub Category"].apply(_canonicalize_subcat)
 
-    # Only rows that can actually be ranked -- matches top_funds()'s own
-    # behaviour of dropping NaN Peer_Rank/Composite_Score rows.
     df = df.dropna(subset=["Composite_Score", "Peer_Rank", "Scheme Name", "Sub Category"])
 
-    # Collapse Growth/IDCW/Dividend/... plan-option duplicates of the
-    # same underlying fund down to one row, preferring Growth and then
-    # the best (lowest) Peer_Rank.
     df["_dedup_key"] = df["Scheme Name"].apply(_fund_dedup_key)
     df["_is_growth"] = df["Scheme Name"].apply(_is_growth_variant)
     df["Peer_Rank"] = pd.to_numeric(df["Peer_Rank"], errors="coerce")
