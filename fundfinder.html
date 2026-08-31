@@ -109,8 +109,15 @@
     box-shadow:0 10px 28px rgba(42,29,20,0.16);
     max-height:360px; overflow-y:auto;
   }
+  /* Suggestion rows: was a single nowrap/ellipsis line, which clipped
+     long fund names on narrow (mobile) screens so the user could never
+     see the full suggestion text. Now wraps: tag + label share the top
+     line and wrap onto more lines as needed, and the AMC/asset-type
+     meta text always drops to its own full-width line underneath
+     rather than getting squeezed or cut off next to the label. */
   .suggest-item{
-    display:flex; align-items:center; gap:10px; width:100%;
+    display:flex; align-items:flex-start; gap:6px 10px; width:100%;
+    flex-wrap:wrap;
     padding:11px 16px; background:none; border:none; text-align:left;
     font-family:inherit; font-size:0.92rem; color:var(--ink); cursor:pointer;
     border-bottom:1px solid #F0E6D6;
@@ -120,11 +127,21 @@
   .tag{
     flex:none; font-size:0.65rem; font-weight:700; text-transform:uppercase;
     letter-spacing:0.03em; padding:2px 8px; border-radius:999px;
+    margin-top:2px;
   }
   .tag.fund{ background:#E8F3F0; color:var(--ikat-teal); }
   .tag.cat{ background:#FBEBD4; color:#93610E; }
-  .suggest-label{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .suggest-meta{ flex:none; font-size:0.76rem; color:var(--ink-soft); }
+  .suggest-label{
+    flex:1 1 160px; min-width:0;
+    white-space:normal; overflow:visible; text-overflow:unset;
+    overflow-wrap:break-word; word-break:break-word;
+    line-height:1.35;
+  }
+  .suggest-meta{
+    flex:0 0 100%; font-size:0.76rem; color:var(--ink-soft);
+    white-space:normal; overflow-wrap:break-word; word-break:break-word;
+    margin-top:1px;
+  }
   .suggest-empty{ padding:16px; font-size:0.9rem; color:var(--ink-soft); }
 
   /* ---------- back link ---------- */
@@ -230,6 +247,26 @@
 
   .score-line{ font-weight:700; margin:14px 0 22px; font-size:0.94rem; }
 
+  /* ---------- available plans & options ---------- */
+  .plans-hint{ color:var(--ink-soft); font-size:0.8rem; font-style:italic; margin:0 0 10px; }
+  .plans-list{ display:flex; flex-direction:column; gap:10px; margin-bottom:22px; }
+  .plan-group{
+    background:var(--paper); border:1.5px solid var(--ink); border-radius:12px;
+    padding:10px 14px;
+  }
+  .plan-title{ font-weight:800; font-size:0.9rem; margin-bottom:6px; color:var(--ikat-teal); }
+  .plan-option-row{
+    display:flex; align-items:center; flex-wrap:wrap; gap:4px 10px;
+    padding:7px 0; border-top:1px solid #F0E6D6;
+  }
+  .plan-option-row:first-of-type{ border-top:none; }
+  .plan-option-label{ flex:1 1 auto; min-width:0; font-size:0.88rem; font-weight:600; word-break:break-word; }
+  .plan-option-nav{ font-size:0.85rem; color:var(--ink-soft); white-space:nowrap; }
+  .current-tag{
+    font-size:0.68rem; font-weight:800; text-transform:uppercase; letter-spacing:0.03em;
+    color:var(--up); background:#E4F3EB; padding:2px 8px; border-radius:999px;
+  }
+
   .verdict-card{
     border:1.5px solid var(--ink); border-radius:var(--radius); padding:16px;
     background:var(--paper); margin-bottom:8px;
@@ -318,8 +355,12 @@
    array so the page still loads without erroring.
    Each record: {name, amc, assetType, subCategoryRaw, subCategoryLabel,
    nav, returns:{1D,6M,1Y,3Y,5Y}, risk:{vol,mdd,sharpe,sortino,calmar},
-   peerPctile, compositeScore, peerRank} — numeric fields may be null
-   when the underlying fund doesn't have enough history for that metric.
+   peerPctile, compositeScore, peerRank,
+   plans:[{name,plan,option,frequency,nav,isCurrent}, ...]} — numeric
+   fields may be null when the underlying fund doesn't have enough
+   history for that metric. `plans` lists every purchasable Plan/Option/
+   IDCW-frequency combination of this SAME underlying fund (including
+   this record's own row, isCurrent=true).
    ===================================================================== */
 const FUNDS = /*__FUND_DATA_JSON__*/[]/*__END_FUND_DATA_JSON__*/;
 
@@ -443,19 +484,42 @@ function renderHome(){
   });
 }
 
-const TOP_N = 2;
+/* Top-N funds shown per category. Was 2 -- bumped to 5 per request. */
+const TOP_N = 5;
+
+/* Collapse a sorted fund list down to at most one fund per AMC, keeping
+   whichever appears first (i.e. the best-ranked one, since the caller
+   sorts by compositeScore descending before calling this). Mirrors the
+   backend's top_funds() AMC dedup (finance_bot.py) so the "Top funds"
+   view here shows one fund per fund-house rather than letting a single
+   AMC's multiple funds crowd out the rest of the category. Only applied
+   to the compact "Top N" view -- "View all" intentionally still shows
+   every fund from every AMC, since that button promises literally all
+   funds in the category. */
+function dedupeByAmc(sortedFunds){
+  const seen = new Set();
+  const out = [];
+  sortedFunds.forEach(f=>{
+    const key = f.amc || "";
+    if(key && seen.has(key)) return;
+    if(key) seen.add(key);
+    out.push(f);
+  });
+  return out;
+}
 
 function openCategory(subCategory, showAll){
   renderBack(true);
   const label = labelFor(subCategory);
-  const all = FUNDS.filter(f=>f.subCategoryRaw===subCategory)
+  const allSorted = FUNDS.filter(f=>f.subCategoryRaw===subCategory)
                     .slice()
                     .sort((a,b)=>b.compositeScore-a.compositeScore);
-  const subset = showAll ? all : all.slice(0, TOP_N);
+  const topPool = dedupeByAmc(allSorted);
+  const subset = showAll ? allSorted : topPool.slice(0, TOP_N);
   const heading = showAll ? "All funds in" : "Top funds in";
   const note = showAll
-    ? `${all.length} fund${all.length===1?"":"s"} · every fund we have in this category, ranked by composite score. Tap a fund for the full sheet.`
-    : `Showing top ${subset.length} of ${all.length} · ranked by composite score (return, risk-adjusted return, drawdown &amp; volatility vs. category peers). Tap a fund for the full sheet.`;
+    ? `${allSorted.length} fund${allSorted.length===1?"":"s"} · every fund we have in this category, ranked by composite score. Tap a fund for the full sheet.`
+    : `Showing top ${subset.length} of ${allSorted.length} · one fund per AMC, ranked by composite score (return, risk-adjusted return, drawdown &amp; volatility vs. category peers). Tap a fund for the full sheet.`;
 
   let html = `<h2 class="cat-heading">${heading} <span class="cat-name">${esc(label)}</span></h2>
     <p class="cat-note">${note}</p>`;
@@ -480,8 +544,8 @@ function openCategory(subCategory, showAll){
     </div>`;
   });
 
-  if(!showAll && all.length > TOP_N){
-    html += `<button class="view-all-btn" id="viewAllBtn">View all ${all.length} funds in ${esc(label)}</button>`;
+  if(!showAll && allSorted.length > subset.length){
+    html += `<button class="view-all-btn" id="viewAllBtn">View all ${allSorted.length} funds in ${esc(label)}</button>`;
   } else if(showAll){
     html += `<button class="view-all-btn" id="viewTopBtn">Show top performers only</button>`;
   }
@@ -521,6 +585,47 @@ function buildVerdict(f){
     body = `Numbers here are mixed: a 3-year CAGR of ${cagr3y} against a drawdown of ${mdd} and a Sharpe ratio of ${sharpe} don't clearly lean either way. It's placed in the ${pctile} against peers — middling rather than standout. Worth weighing against your own goals and time horizon rather than the numbers alone.`;
   }
   return {verdict, body};
+}
+
+/* Plan display order: Direct first (lower expense ratio, what most
+   retail investors want), then Regular, then anything unclassified. */
+const PLAN_ORDER = ["Direct","Regular"];
+
+function renderPlans(f){
+  if(!f.plans || f.plans.length<2) return "";
+
+  const byPlan = new Map();
+  f.plans.forEach(p=>{
+    const key = p.plan || "Other";
+    if(!byPlan.has(key)) byPlan.set(key, []);
+    byPlan.get(key).push(p);
+  });
+  const orderedKeys = [
+    ...PLAN_ORDER.filter(k=>byPlan.has(k)),
+    ...[...byPlan.keys()].filter(k=>!PLAN_ORDER.includes(k))
+  ];
+
+  let html = `<div class="section-label" style="margin-top:0;">Available Plans &amp; Options</div>
+    <p class="plans-hint">Same underlying fund — pick the Plan/Option you hold or want to invest in.</p>
+    <div class="plans-list">`;
+
+  orderedKeys.forEach(planKey=>{
+    html += `<div class="plan-group"><div class="plan-title">${esc(planKey)} Plan</div>`;
+    byPlan.get(planKey).forEach(p=>{
+      const optionLabel = p.frequency ? `${p.frequency} ${p.option}` : p.option;
+      const navBit = (p.nav!==null && p.nav!==undefined) ? `NAV ₹${p.nav.toFixed(2)}` : "";
+      const currentTag = p.isCurrent ? `<span class="current-tag">Viewing</span>` : "";
+      html += `<div class="plan-option-row">
+        <span class="plan-option-label">${esc(optionLabel)}</span>
+        <span class="plan-option-nav">${navBit}</span>
+        ${currentTag}
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  html += `</div>`;
+  return html;
 }
 
 function openFund(name){
@@ -564,6 +669,8 @@ function openFund(name){
   });
 
   html += `<p class="score-line">Composite Score: ${numOr(f.compositeScore,1)} &middot; Peer Rank: #${f.peerRank ?? "—"}</p>`;
+
+  html += renderPlans(f);
 
   const {verdict, body} = buildVerdict(f);
   html += `<div class="section-label" style="margin-top:8px;">AI Verdict</div>
