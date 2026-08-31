@@ -829,7 +829,7 @@ function renderCategoryView(subCategory, showAll){
   const subset = showAll ? dedupedSorted : dedupedSorted.slice(0, TOP_N);
   const heading = showAll ? "All funds in" : "Top funds in";
   const ampNote = allSorted.length > dedupedSorted.length
-    ? ` One fund per AMC is shown (highest ranked) — search above for a specific fund or share class.`
+    ? ` search above for a specific fund or share class.`
     : ``;
   const note = showAll
     ? `${dedupedSorted.length} fund${dedupedSorted.length===1?"":"s"} ·, ranked by composite score.${ampNote} Tap a fund for the full sheet.`
