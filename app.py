@@ -20,7 +20,7 @@ from finance_bot import (
     subcat_browse_label,
 )
 
-st.set_page_config(page_title="FundFinder", page_icon="📈", layout="wide")
+st.set_page_config(page_title="MIRA-AI", page_icon="👑", layout="wide")
 
 # Streamlit wraps every page in its own chrome (top padding, a hidden
 # hamburger menu, a "Made with Streamlit" footer). Hidden here so the
